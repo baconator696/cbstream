@@ -31,11 +31,10 @@ impl Models {
                 }
             }
         }
-        self.update_config().map_err(s!())?;
         Ok(())
     }
     /// updates Models struct with json if the json was updated
-    fn update_config(&mut self) -> Result<()> {
+    pub fn update_config(&mut self) -> Result<()> {
         let json = parse_json(&self.filepath).map_err(s!())?;
         // reloads CB models from json
         self.update_config_internal(&json, "CB models", cb::update).map_err(s!())?;
@@ -102,7 +101,8 @@ fn parse_json(filepath: &str) -> Result<serde_json::Value> {
             });
             fs::write(filepath, serde_json::to_string_pretty(&json).map_err(e!())?)
                 .map_err(e!())?;
-            return Err(format!("Fill in {} with the given fields", filepath))?;
+            println!("Fill in {} with the given fields", filepath);
+            process::exit(0)
         }
     };
     let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
