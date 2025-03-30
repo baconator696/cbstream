@@ -12,6 +12,7 @@ pub struct Cb {
     abort: Arc<RwLock<bool>>,
 }
 impl Cb {
+    /// creates Cb struct
     fn new(username: &str) -> Self {
         Self {
             username: username.to_string(),
@@ -20,7 +21,8 @@ impl Cb {
             abort: Arc::new(RwLock::new(false)),
         }
     }
-    fn update_playlist(&mut self) -> Result<()> {
+    /// downloads the latest playlist 
+    fn get_playlist(&mut self) -> Result<()> {
         let url = format!(
             "https://chaturbate.com/api/chatvideocontext/{}/",
             self.username
@@ -65,7 +67,7 @@ impl Cb {
 }
 impl ModelInfo for Cb {
     fn is_online(&mut self) -> Result<bool> {
-        self.update_playlist().map_err(s!())?;
+        self.get_playlist().map_err(s!())?;
         Ok(self.playlist_link.is_some())
     }
     fn is_finished(&self) -> bool {
@@ -100,59 +102,37 @@ impl ModelInfo for Cb {
         Ok(())
     }
 }
-pub fn new(models: Option<&Vec<serde_json::Value>>) -> Option<HashMap<String, Box<dyn ModelInfo>>> {
-    match models {
-        Some(models) => {
-            let mut map: HashMap<String, Box<dyn ModelInfo>> = HashMap::new();
-            for model in models {
-                if let Some(model) = model.as_str() {
-                    map.insert(model.to_string(), Box::new(Cb::new(model)));
-                }
+/// function to initialize the data from the json
+pub fn new(models: Option<&Vec<serde_json::Value>>) -> HashMap<String, Box<dyn ModelInfo>> {
+    let mut map: HashMap<String, Box<dyn ModelInfo>> = HashMap::new();
+    if let Some(models) = models {
+        for model in models {
+            if let Some(model) = model.as_str() {
+                map.insert(model.to_string(), Box::new(Cb::new(model)));
             }
-            if map.len() != 0 { Some(map) } else { None }
         }
-        None => None,
     }
+    map
 }
-pub fn update(
-    models: Option<&Vec<serde_json::Value>>,
-    current: Option<&mut HashMap<String, Box<dyn ModelInfo>>>,
-) -> Option<HashMap<String, Box<dyn ModelInfo>>> {
-    let current = match current {
-        Some(o) => o,
-        None => return new(models),
-    };
+/// function to update the data from the json
+pub fn update(models: Option<&Vec<serde_json::Value>>,current: &mut HashMap<String, Box<dyn ModelInfo>>) -> HashMap<String, Box<dyn ModelInfo>> {
     let mut new_map: HashMap<String, Box<dyn ModelInfo>> = HashMap::new();
-    match models {
-        Some(models) => {
-            for model in models {
-                if let Some(model) = model.as_str() {
-                    if new_map.contains_key(model) {
-                        continue;
-                    }
-                    if current.contains_key(model) {
-                        new_map.insert(model.to_string(), current.remove(model).unwrap());
-                    } else {
-                        new_map.insert(model.to_string(), Box::new(Cb::new(model)));
-                    }
+    if let Some(models) = models {
+        for model in models {
+            if let Some(model) = model.as_str() {
+                if new_map.contains_key(model) {
+                    continue;
                 }
-            }
-            if new_map.len() != 0 {
-                Some(new_map)
-            } else {
-                None
-            }
-        }
-        None => {
-            if new_map.len() != 0 {
-                Some(new_map)
-            } else {
-                None
+                if current.contains_key(model) {
+                    new_map.insert(model.to_string(), current.remove(model).unwrap());
+                } else {
+                    new_map.insert(model.to_string(), Box::new(Cb::new(model)));
+                }
             }
         }
     }
+    new_map
 }
-
 impl ManagePlaylist for Playlist {
     fn playlist(&mut self) -> Result<()> {
         while !*self.abort.read().map_err(s!())? && !abort::get().map_err(s!())? {
@@ -184,6 +164,7 @@ impl ManagePlaylist for Playlist {
         let mut date: Option<String> = None;
         if let Some(playlist) = &self.playlist {
             for line in playlist.split("\n") {
+                // parses date and time from playlist
                 if let Some(n) = line.find("TIME") {
                     if line.len() < 21 {
                         return Err("error parsing date from playlist")?;
@@ -194,10 +175,13 @@ impl ManagePlaylist for Playlist {
                 if line.len() == 0 || &line[..1] == "#" {
                     continue;
                 }
+                // parses relevant information
                 let url = format!("{}/{}", self.url_prefix().map_err(s!())?, line);
-                let time = line.split("_").last().ok_or_else(o!())?;
-                let n = time.find(".").ok_or_else(o!())?;
-                let time = (&time[..n]).trim().parse::<u32>().map_err(e!())?;
+                // parses stream id
+                let id = line.split("_").last().ok_or_else(o!())?;
+                let n = id.find(".").ok_or_else(o!())?;
+                let id = (&id[..n]).trim().parse::<u32>().map_err(e!())?;
+                // determines temp directory
                 let temp_dir = if cfg!(target_os = "windows") {
                     let t = env::var("TEMP").map_err(e!())?;
                     format!("{}\\cbstream\\", t)
@@ -208,6 +192,7 @@ impl ManagePlaylist for Playlist {
                     };
                     format!("{}/cbstream/", t)
                 };
+                // creates temp directory
                 match fs::create_dir_all(&temp_dir) {
                     Err(e) => {
                         if e.kind() != io::ErrorKind::AlreadyExists {
@@ -216,26 +201,23 @@ impl ManagePlaylist for Playlist {
                     }
                     _ => (),
                 }
-                let name = match &date {
+                let filename = match &date {
                     Some(date) => {
-                        format!("CB{}{}", self.username, date)
+                        format!("CB_{}_{}", self.username, date)
                     }
                     None => break,
                 };
-                let filepath = format!("{}{}.ts", temp_dir, time);
-                println!("{}_{}", name, time);
+                let filepath = format!("{}{}-{}.ts", temp_dir, self.username,id);
                 streams.push(Stream {
-                    name,
+                    filename,
                     url,
-                    time,
+                    time: id,
                     filepath,
                     file: None,
                     last: None,
                 });
             }
         }
-
-        // todo
         Ok(streams)
     }
     fn mux_streams(&mut self) -> Result<()> {
@@ -244,6 +226,7 @@ impl ManagePlaylist for Playlist {
             Some(o) => o,
             None => return Ok(()),
         };
+        // adds all streams to an iterator
         loop {
             streams.push(last.clone());
             let l = match last.write().map_err(s!())?.last.take() {
@@ -256,11 +239,13 @@ impl ManagePlaylist for Playlist {
             return Ok(());
         }
         streams.reverse();
+        // gets os slash
         let slash = if cfg!(target_os = "windows") {
             "\\"
         } else {
             "/"
         };
+        // creates output directory, places in current directory
         match fs::create_dir(&self.username) {
             Err(r) => {
                 if r.kind() != io::ErrorKind::AlreadyExists {
@@ -269,17 +254,20 @@ impl ManagePlaylist for Playlist {
             }
             _ => (),
         };
+        // creates filename
         let filename = format!(
-            "{}{}CB_{}.ts",
+            "{}{}{}.ts",
             &self.username,
             slash,
-            streams[0].read().map_err(s!())?.name
+            streams[0].read().map_err(s!())?.filename
         );
+        // creates file
         let mut file = fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(filename)
             .map_err(e!())?;
+        // muxes stream to file
         for stream in streams {
             let s = &mut (*stream.write().map_err(s!())?);
             if let Some(mut f) = s.file.take() {
@@ -294,6 +282,7 @@ impl ManagePlaylist for Playlist {
 }
 impl ManageStream for Stream {
     fn download(&mut self, last: Option<Arc<RwLock<Stream>>>) -> Result<()> {
+        println!("{}_{}", self.filename, self.time);
         self.last = last;
         let data = util::get_retry_vec(&self.url, 5).map_err(s!())?;
         let mut file = fs::File::create_new(&self.filepath).map_err(e!())?;
