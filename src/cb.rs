@@ -1,7 +1,7 @@
-use crate::stream::{ManagePlaylist, ManageStream, Playlist, Stream};
+use crate::stream::{ManagePlaylist, Playlist, Stream};
 use crate::{abort, config::ModelActions, util};
 use crate::{e, h, o, s};
-use std::io::{Read, Seek, Write};
+use std::io::{Read, Write};
 use std::sync::{Arc, RwLock};
 use std::{thread::JoinHandle, *};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
@@ -81,7 +81,7 @@ impl ModelActions for CbModel {
         let a = self.abort.clone();
         let p = self.playlist_link.clone().ok_or_else(o!())?;
         let handle: thread::JoinHandle<()> = thread::spawn(move || {
-            let mut playlist = Playlist::new(u, p, a).map_err(s!()).unwrap();
+            let mut playlist = CbPlaylist::new(u, p, a);
             playlist.playlist().unwrap();
         });
         if let Some(h) = self.thread_handle.replace(handle) {
@@ -94,25 +94,31 @@ impl ModelActions for CbModel {
         Ok(())
     }
 }
-impl ManagePlaylist for Playlist {
+struct CbPlaylist(Playlist);
+impl CbPlaylist {
+    pub fn new(username: String, playlist_url: String, abort: Arc<RwLock<bool>>) -> Self {
+        CbPlaylist(Playlist::new(username, playlist_url, abort))
+    }
+}
+impl ManagePlaylist for CbPlaylist {
     fn playlist(&mut self) -> Result<()> {
-        while !self.abort_get().map_err(s!())? && !abort::get().map_err(s!())? {
-            if self.update_playlist().is_err() {
+        while !self.0.abort_get().map_err(s!())? && !abort::get().map_err(s!())? {
+            if self.0.update_playlist().is_err() {
                 break;
             }
             for stream in self.parse_playlist().map_err(s!())? {
-                if let Some(last) = &self.last_stream {
+                if let Some(last) = &self.0.last_stream {
                     if stream <= *last.read().map_err(s!())? {
                         continue;
                     }
                 }
                 let stream = Arc::new(RwLock::new(stream));
                 let s = stream.clone();
-                let l = self.last_stream.clone();
+                let l = self.0.last_stream.clone();
                 thread::spawn(move || {
                     (*s.write().unwrap()).download(l).unwrap();
                 });
-                self.last_stream = Some(stream);
+                self.0.last_stream = Some(stream);
                 thread::sleep(time::Duration::from_millis(500));
             }
             thread::sleep(time::Duration::from_millis(1500));
@@ -123,7 +129,7 @@ impl ManagePlaylist for Playlist {
     fn parse_playlist(&self) -> Result<Vec<Stream>> {
         let mut streams = Vec::new();
         let mut date: Option<String> = None;
-        if let Some(playlist) = &self.playlist {
+        if let Some(playlist) = &self.0.playlist {
             for line in playlist.split("\n") {
                 // parses date and time from playlist
                 if let Some(n) = line.find("TIME") {
@@ -137,7 +143,7 @@ impl ManagePlaylist for Playlist {
                     continue;
                 }
                 // parses relevant information
-                let url = format!("{}/{}", self.url_prefix().map_err(s!())?, line);
+                let url = format!("{}/{}", self.0.url_prefix().map_err(s!())?, line);
                 // parses stream id
                 let id = line.split("_").last().ok_or_else(o!())?;
                 let n = id.find(".").ok_or_else(o!())?;
@@ -164,11 +170,11 @@ impl ManagePlaylist for Playlist {
                 }
                 let filename = match &date {
                     Some(date) => {
-                        format!("CB_{}_{}", self.username, date)
+                        format!("CB_{}_{}", self.0.username, date)
                     }
                     None => break,
                 };
-                let filepath = format!("{}{}-{}.ts", temp_dir, self.username, id);
+                let filepath = format!("{}{}-{}.ts", temp_dir, self.0.username, id);
                 streams.push(Stream {
                     filename,
                     url,
@@ -183,7 +189,7 @@ impl ManagePlaylist for Playlist {
     }
     fn mux_streams(&mut self) -> Result<()> {
         let mut streams: Vec<sync::Arc<sync::RwLock<Stream>>> = Vec::new();
-        let mut last = match self.last_stream.take() {
+        let mut last = match self.0.last_stream.take() {
             Some(o) => o,
             None => return Ok(()),
         };
@@ -203,7 +209,7 @@ impl ManagePlaylist for Playlist {
         // gets os slash
         let slash = if cfg!(target_os = "windows") { "\\" } else { "/" };
         // creates output directory, places in current directory
-        match fs::create_dir(&self.username) {
+        match fs::create_dir(&self.0.username) {
             Err(r) => {
                 if r.kind() != io::ErrorKind::AlreadyExists {
                     return Err(r).map_err(s!())?;
@@ -212,7 +218,7 @@ impl ManagePlaylist for Playlist {
             _ => (),
         };
         // creates filename
-        let filename = format!("{}{}{}.ts", &self.username, slash, streams[0].read().map_err(s!())?.filename);
+        let filename = format!("{}{}{}.ts", &self.0.username, slash, streams[0].read().map_err(s!())?.filename);
         // creates file
         let mut file = fs::OpenOptions::new().create(true).append(true).open(filename).map_err(e!())?;
         // muxes stream to file
@@ -225,18 +231,6 @@ impl ManagePlaylist for Playlist {
                 fs::remove_file(&s.filepath).map_err(e!())?;
             }
         }
-        Ok(())
-    }
-}
-impl ManageStream for Stream {
-    fn download(&mut self, last: Option<Arc<RwLock<Stream>>>) -> Result<()> {
-        println!("{}_{}", self.filename, self.time);
-        self.last = last;
-        let data = util::get_retry_vec(&self.url, 5).map_err(s!())?;
-        let mut file = fs::File::create_new(&self.filepath).map_err(e!())?;
-        file.write_all(&data).map_err(e!())?;
-        file.seek(io::SeekFrom::Start(0)).map_err(e!())?;
-        self.file = Some(file);
         Ok(())
     }
 }

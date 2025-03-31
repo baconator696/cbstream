@@ -1,5 +1,6 @@
-use crate::s;
 use crate::util;
+use crate::{e, s};
+use std::io::{Seek, Write};
 use std::sync::{Arc, RwLock};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
@@ -21,15 +22,15 @@ pub struct Playlist {
 }
 impl Playlist {
     /// creates Playlist struct
-    pub fn new(username: String, playlist_url: String, abort: Arc<RwLock<bool>>) -> Result<Self> {
-        Ok(Playlist {
+    pub fn new(username: String, playlist_url: String, abort: Arc<RwLock<bool>>) -> Self {
+        Playlist {
             username,
             playlist_url,
             playlist: None,
             last_stream: None,
             abort,
             //muxing_handles: Vec::new(),
-        })
+        }
     }
     /// updates download playlist with url
     pub fn update_playlist(&mut self) -> Result<()> {
@@ -54,10 +55,6 @@ impl Playlist {
         Ok(*self.abort.read().map_err(s!())?)
     }
 }
-pub trait ManageStream {
-    /// downloads the stream given the Stream's url
-    fn download(&mut self, last: Option<Arc<RwLock<Stream>>>) -> Result<()>;
-}
 pub struct Stream {
     pub filename: String,
     pub url: String,
@@ -65,6 +62,19 @@ pub struct Stream {
     pub filepath: String,
     pub file: Option<fs::File>,
     pub last: Option<Arc<RwLock<Stream>>>,
+}
+impl Stream {
+    /// downloads the stream given the Stream's url
+    pub fn download(&mut self, last: Option<Arc<RwLock<Stream>>>) -> Result<()> {
+        println!("{}_{}", self.filename, self.time);
+        self.last = last;
+        let data = util::get_retry_vec(&self.url, 5).map_err(s!())?;
+        let mut file = fs::File::create_new(&self.filepath).map_err(e!())?;
+        file.write_all(&data).map_err(e!())?;
+        file.seek(io::SeekFrom::Start(0)).map_err(e!())?;
+        self.file = Some(file);
+        Ok(())
+    }
 }
 impl Drop for Stream {
     /// removes downloaded stream file
