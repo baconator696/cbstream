@@ -3,7 +3,7 @@ use crate::{e, o, s};
 use std::collections::HashMap;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 use std::*;
-pub trait ModelInfo {
+pub trait ModelActions {
     fn is_online(&mut self) -> Result<bool>;
     fn is_finished(&self) -> bool;
     fn download(&mut self) -> Result<()>;
@@ -12,7 +12,7 @@ pub trait ModelInfo {
 }
 pub struct Models {
     filepath: String,
-    models: HashMap<String, HashMap<String, Box<dyn ModelInfo>>>,
+    models: HashMap<String, HashMap<String, Box<dyn ModelActions>>>,
 }
 impl Models {
     /// checks each model, and starts download if online
@@ -37,7 +37,7 @@ impl Models {
     pub fn update_config(&mut self) -> Result<()> {
         let json = parse_json(&self.filepath).map_err(s!())?;
         // reloads CB models from json
-        update_internal(&mut self.models, "CB models", &json, cb::Cb::new).map_err(s!())?;
+        update_internal(&mut self.models, "CB models", &json, cb::CbModel::new).map_err(s!())?;
         Ok(())
     }
 }
@@ -56,21 +56,21 @@ impl Drop for Models {
 /// Initializes Models struct by loading it with model names from cb-config.json
 pub fn load(json_path: &str) -> Result<Models> {
     let json = parse_json(json_path).map_err(s!())?;
-    let mut models: HashMap<String, HashMap<String, Box<dyn ModelInfo>>> = HashMap::new();
+    let mut models: HashMap<String, HashMap<String, Box<dyn ModelActions>>> = HashMap::new();
     // loads CB models from json
-    let (k, m) = load_internal(&json, "CB models", cb::Cb::new);
+    let (k, m) = load_internal(&json, "CB models", cb::CbModel::new);
     models.insert(k, m);
     Ok(Models {
         filepath: json_path.to_string(),
         models,
     })
 }
-fn load_internal<T: ModelInfo + 'static>(
+fn load_internal<T: ModelActions + 'static>(
     models_json: &serde_json::Value,
     key: &str,
     func: fn(&str) -> T,
-) -> (String, HashMap<String, Box<dyn ModelInfo>>) {
-    let mut map: HashMap<String, Box<dyn ModelInfo>> = HashMap::new();
+) -> (String, HashMap<String, Box<dyn ModelActions>>) {
+    let mut map: HashMap<String, Box<dyn ModelActions>> = HashMap::new();
     if let Some(models) = models_json[key].as_array() {
         for model in models {
             if let Some(model) = model.as_str() {
@@ -80,14 +80,14 @@ fn load_internal<T: ModelInfo + 'static>(
     }
     (key.to_string(), map)
 }
-fn update_internal<T: ModelInfo + 'static>(
-    models: &mut HashMap<String, HashMap<String, Box<dyn ModelInfo>>>,
+fn update_internal<T: ModelActions + 'static>(
+    models: &mut HashMap<String, HashMap<String, Box<dyn ModelActions>>>,
     key: &str,
     models_json: &serde_json::Value,
     func: fn(&str) -> T,
 ) -> Result<()> {
     let old_models = models.get_mut(key).ok_or_else(o!())?;
-    let mut new_models: HashMap<String, Box<dyn ModelInfo>> = HashMap::new();
+    let mut new_models: HashMap<String, Box<dyn ModelActions>> = HashMap::new();
     if let Some(models_json) = models_json[key].as_array() {
         for model in models_json {
             if let Some(model) = model.as_str() {

@@ -3,12 +3,20 @@ use crate::util;
 use std::sync::{Arc, RwLock};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
+pub trait ManagePlaylist {
+    /// main download loop for the playlist
+    fn playlist(&mut self) -> Result<()>;
+    /// parses chaturbate playlist into given streams
+    fn parse_playlist(&self) -> Result<Vec<Stream>>;
+    /// muxes all downloaded streams when stream finishes or is canceled
+    fn mux_streams(&mut self) -> Result<()>;
+}
 pub struct Playlist {
     pub username: String,
     playlist_url: String,
     pub playlist: Option<String>,
     pub last_stream: Option<Arc<RwLock<Stream>>>,
-    pub abort: Arc<RwLock<bool>>,
+    abort: Arc<RwLock<bool>>,
     //pub muxing_handles: Vec<thread::JoinHandle<()>>,
 }
 impl Playlist {
@@ -42,14 +50,13 @@ impl Playlist {
         }
         Ok(&self.playlist_url[..n])
     }
+    pub fn abort_get(&self) -> Result<bool> {
+        Ok(*self.abort.read().map_err(s!())?)
+    }
 }
-pub trait ManagePlaylist {
-    /// main download loop for the playlist
-    fn playlist(&mut self) -> Result<()>;
-    /// parses chaturbate playlist into given streams
-    fn parse_playlist(&self) -> Result<Vec<Stream>>;
-    /// muxes all downloaded streams when stream finishes or is canceled
-    fn mux_streams(&mut self) -> Result<()>;
+pub trait ManageStream {
+    /// downloads the stream given the Stream's url
+    fn download(&mut self, last: Option<Arc<RwLock<Stream>>>) -> Result<()>;
 }
 pub struct Stream {
     pub filename: String,
@@ -62,10 +69,10 @@ pub struct Stream {
 impl Drop for Stream {
     /// removes downloaded stream file
     fn drop(&mut self) {
-        self.file = None;
         if self.file.is_some() {
             _ = fs::remove_file(&self.filepath)
         }
+        self.file = None;
     }
 }
 impl PartialEq for Stream {
@@ -77,8 +84,4 @@ impl PartialOrd for Stream {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.time.cmp(&other.time))
     }
-}
-pub trait ManageStream {
-    /// downloads the stream given the Stream's url
-    fn download(&mut self, last: Option<Arc<RwLock<Stream>>>) -> Result<()>;
 }

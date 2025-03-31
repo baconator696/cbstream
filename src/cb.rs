@@ -1,17 +1,17 @@
 use crate::stream::{ManagePlaylist, ManageStream, Playlist, Stream};
-use crate::{abort, config::ModelInfo, util};
+use crate::{abort, config::ModelActions, util};
 use crate::{e, h, o, s};
 use std::io::{Read, Seek, Write};
 use std::sync::{Arc, RwLock};
 use std::{thread::JoinHandle, *};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
-pub struct Cb {
+pub struct CbModel {
     username: String,
     playlist_link: Option<String>,
     thread_handle: Option<JoinHandle<()>>,
     abort: Arc<RwLock<bool>>,
 }
-impl Cb {
+impl CbModel {
     /// creates Cb struct
     pub fn new(username: &str) -> Self {
         Self {
@@ -61,7 +61,7 @@ impl Cb {
         return Ok(());
     }
 }
-impl ModelInfo for Cb {
+impl ModelActions for CbModel {
     fn is_online(&mut self) -> Result<bool> {
         self.get_playlist().map_err(s!())?;
         Ok(self.playlist_link.is_some())
@@ -96,7 +96,7 @@ impl ModelInfo for Cb {
 }
 impl ManagePlaylist for Playlist {
     fn playlist(&mut self) -> Result<()> {
-        while !*self.abort.read().map_err(s!())? && !abort::get().map_err(s!())? {
+        while !self.abort_get().map_err(s!())? && !abort::get().map_err(s!())? {
             if self.update_playlist().is_err() {
                 break;
             }
