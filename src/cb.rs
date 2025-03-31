@@ -81,8 +81,7 @@ impl ModelActions for CbModel {
         let a = self.abort.clone();
         let p = self.playlist_link.clone().ok_or_else(o!())?;
         let handle: thread::JoinHandle<()> = thread::spawn(move || {
-            let mut playlist = CbPlaylist::new(u, p, a);
-            playlist.playlist().unwrap();
+            CbPlaylist::new(u, p, a).playlist().unwrap();
         });
         if let Some(h) = self.thread_handle.replace(handle) {
             h.join().map_err(h!())?;
@@ -175,14 +174,7 @@ impl ManagePlaylist for CbPlaylist {
                     None => break,
                 };
                 let filepath = format!("{}{}-{}.ts", temp_dir, self.0.username, id);
-                streams.push(Stream {
-                    filename,
-                    url,
-                    time: id,
-                    filepath,
-                    file: None,
-                    last: None,
-                });
+                streams.push(Stream::new(&filename, &url, id, &filepath));
             }
         }
         Ok(streams)

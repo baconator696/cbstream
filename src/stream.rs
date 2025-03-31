@@ -57,16 +57,26 @@ impl Playlist {
 }
 pub struct Stream {
     pub filename: String,
-    pub url: String,
-    pub time: u32,
+    url: String,
+    id: u32,
     pub filepath: String,
     pub file: Option<fs::File>,
     pub last: Option<Arc<RwLock<Stream>>>,
 }
 impl Stream {
+    pub fn new(filename: &str, url: &str, id: u32, filepath: &str) -> Self {
+        Self {
+            filename: filename.to_string(),
+            url: url.to_string(),
+            id,
+            filepath: filepath.to_string(),
+            file: None,
+            last: None,
+        }
+    }
     /// downloads the stream given the Stream's url
     pub fn download(&mut self, last: Option<Arc<RwLock<Stream>>>) -> Result<()> {
-        println!("{}_{}", self.filename, self.time);
+        println!("{}_{}", self.filename, self.id);
         self.last = last;
         let data = util::get_retry_vec(&self.url, 5).map_err(s!())?;
         let mut file = fs::File::create_new(&self.filepath).map_err(e!())?;
@@ -82,16 +92,15 @@ impl Drop for Stream {
         if self.file.is_some() {
             _ = fs::remove_file(&self.filepath)
         }
-        self.file = None;
     }
 }
 impl PartialEq for Stream {
     fn eq(&self, other: &Self) -> bool {
-        self.time == other.time
+        self.id == other.id
     }
 }
 impl PartialOrd for Stream {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(self.time.cmp(&other.time))
+        Some(self.id.cmp(&other.id))
     }
 }

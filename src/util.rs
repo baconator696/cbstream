@@ -5,7 +5,6 @@ pub fn get_retry(url: &str, retry: i32) -> Result<String> {
     let f = |url| {
         let resp = reqwest::blocking::get(url).map_err(e!())?;
         let resp_code = resp.status();
-
         let resp_text = if let Some(v) = resp.headers().get("content-encoding") {
             if v.to_str().map_err(e!())? == "gzip" {
                 let resp_data = resp.bytes().map_err(e!())?.to_vec();
