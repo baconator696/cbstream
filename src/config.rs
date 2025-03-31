@@ -37,27 +37,7 @@ impl Models {
     pub fn update_config(&mut self) -> Result<()> {
         let json = parse_json(&self.filepath).map_err(s!())?;
         // reloads CB models from json
-        self.update_config_internal(&json, "CB models", cb::update).map_err(s!())?;
-        Ok(())
-    }
-    fn update_config_internal(
-        &mut self,
-        json: &serde_json::Value,
-        key: &str,
-        update_func: fn(
-            Option<&Vec<serde_json::Value>>,
-            &mut HashMap<String, Box<dyn ModelInfo>>,
-        ) -> HashMap<String, Box<dyn ModelInfo>>,
-    ) -> Result<()> {
-        let old_models = self.models.get_mut(key).ok_or_else(o!())?;
-        let new_models = update_func(json[key].as_array(), old_models);
-        for (name, model) in old_models {
-            if !new_models.contains_key(name) {
-                model.abort().map_err(s!())?;
-                model.clean_handle().map_err(s!())?;
-            }
-        }
-        self.models.insert(key.into(), new_models);
+        update_internal(&mut self.models, "CB models", &json, cb::Cb::new).map_err(s!())?;
         Ok(())
     }
 }
@@ -78,13 +58,58 @@ pub fn load(json_path: &str) -> Result<Models> {
     let json = parse_json(json_path).map_err(s!())?;
     let mut models: HashMap<String, HashMap<String, Box<dyn ModelInfo>>> = HashMap::new();
     // loads CB models from json
-    let k = "CB models";
-    let new = cb::new;
-    models.insert(k.into(), new(json[k].as_array()));
+    let (k, m) = load_internal(&json, "CB models", cb::Cb::new);
+    models.insert(k, m);
     Ok(Models {
         filepath: json_path.to_string(),
         models,
     })
+}
+fn load_internal<T: ModelInfo + 'static>(
+    models_json: &serde_json::Value,
+    key: &str,
+    func: fn(&str) -> T,
+) -> (String, HashMap<String, Box<dyn ModelInfo>>) {
+    let mut map: HashMap<String, Box<dyn ModelInfo>> = HashMap::new();
+    if let Some(models) = models_json[key].as_array() {
+        for model in models {
+            if let Some(model) = model.as_str() {
+                map.insert(model.to_string(), Box::new(func(model)));
+            }
+        }
+    }
+    (key.to_string(), map)
+}
+fn update_internal<T: ModelInfo + 'static>(
+    models: &mut HashMap<String, HashMap<String, Box<dyn ModelInfo>>>,
+    key: &str,
+    models_json: &serde_json::Value,
+    func: fn(&str) -> T,
+) -> Result<()> {
+    let old_models = models.get_mut(key).ok_or_else(o!())?;
+    let mut new_models: HashMap<String, Box<dyn ModelInfo>> = HashMap::new();
+    if let Some(models_json) = models_json[key].as_array() {
+        for model in models_json {
+            if let Some(model) = model.as_str() {
+                if new_models.contains_key(model) {
+                    continue;
+                }
+                if old_models.contains_key(model) {
+                    new_models.insert(model.to_string(), old_models.remove(model).unwrap());
+                } else {
+                    new_models.insert(model.to_string(), Box::new(func(model)));
+                }
+            }
+        }
+    }
+    for (name, model) in old_models {
+        if !new_models.contains_key(name) {
+            model.abort().map_err(s!())?;
+            model.clean_handle().map_err(s!())?;
+        }
+    }
+    models.insert(key.into(), new_models);
+    Ok(())
 }
 /// parses json from cb-config.json as a serde data
 fn parse_json(filepath: &str) -> Result<serde_json::Value> {

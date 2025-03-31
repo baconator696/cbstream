@@ -3,7 +3,7 @@ use crate::{abort, config::ModelInfo, util};
 use crate::{e, h, o, s};
 use std::io::{Read, Seek, Write};
 use std::sync::{Arc, RwLock};
-use std::{collections::HashMap, thread::JoinHandle, *};
+use std::{thread::JoinHandle, *};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 pub struct Cb {
     username: String,
@@ -13,7 +13,7 @@ pub struct Cb {
 }
 impl Cb {
     /// creates Cb struct
-    fn new(username: &str) -> Self {
+    pub fn new(username: &str) -> Self {
         Self {
             username: username.to_string(),
             playlist_link: None,
@@ -21,7 +21,7 @@ impl Cb {
             abort: Arc::new(RwLock::new(false)),
         }
     }
-    /// downloads the latest playlist 
+    /// downloads the latest playlist
     fn get_playlist(&mut self) -> Result<()> {
         let url = format!(
             "https://chaturbate.com/api/chatvideocontext/{}/",
@@ -29,8 +29,7 @@ impl Cb {
         );
         let json_raw = match util::get_retry(&url, 5).map_err(s!()) {
             Ok(r) => r,
-            Err(e) => {
-                eprintln!("username:'{}' probably doesn't exist\n{}", self.username, e);
+            _ => {
                 self.playlist_link = None;
                 return Ok(());
             }
@@ -101,37 +100,6 @@ impl ModelInfo for Cb {
         *self.abort.write().map_err(s!())? = true;
         Ok(())
     }
-}
-/// function to initialize the data from the json
-pub fn new(models: Option<&Vec<serde_json::Value>>) -> HashMap<String, Box<dyn ModelInfo>> {
-    let mut map: HashMap<String, Box<dyn ModelInfo>> = HashMap::new();
-    if let Some(models) = models {
-        for model in models {
-            if let Some(model) = model.as_str() {
-                map.insert(model.to_string(), Box::new(Cb::new(model)));
-            }
-        }
-    }
-    map
-}
-/// function to update the data from the json
-pub fn update(models: Option<&Vec<serde_json::Value>>,current: &mut HashMap<String, Box<dyn ModelInfo>>) -> HashMap<String, Box<dyn ModelInfo>> {
-    let mut new_map: HashMap<String, Box<dyn ModelInfo>> = HashMap::new();
-    if let Some(models) = models {
-        for model in models {
-            if let Some(model) = model.as_str() {
-                if new_map.contains_key(model) {
-                    continue;
-                }
-                if current.contains_key(model) {
-                    new_map.insert(model.to_string(), current.remove(model).unwrap());
-                } else {
-                    new_map.insert(model.to_string(), Box::new(Cb::new(model)));
-                }
-            }
-        }
-    }
-    new_map
 }
 impl ManagePlaylist for Playlist {
     fn playlist(&mut self) -> Result<()> {
@@ -207,7 +175,7 @@ impl ManagePlaylist for Playlist {
                     }
                     None => break,
                 };
-                let filepath = format!("{}{}-{}.ts", temp_dir, self.username,id);
+                let filepath = format!("{}{}-{}.ts", temp_dir, self.username, id);
                 streams.push(Stream {
                     filename,
                     url,
