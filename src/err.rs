@@ -6,13 +6,7 @@ macro_rules! s {
     () => {
         |e| {
             let caller = panic::Location::caller();
-            format!(
-                "{}:({}:{}):{}",
-                caller.file(),
-                caller.line(),
-                caller.column(),
-                e
-            )
+            format!("{}:({}:{}):{}", caller.file(), caller.line(), caller.column(), e)
         }
     };
 }
@@ -22,13 +16,7 @@ macro_rules! e {
     () => {
         |e| {
             let caller = panic::Location::caller();
-            format!(
-                "{}:({}:{}):{:?}",
-                caller.file(),
-                caller.line(),
-                caller.column(),
-                e
-            )
+            format!("{}:({}:{}):{:?}", caller.file(), caller.line(), caller.column(), e)
         }
     };
 }

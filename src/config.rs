@@ -124,8 +124,7 @@ fn parse_json(filepath: &str) -> Result<serde_json::Value> {
                 "MFC models": [],
                 "SC models": []
             });
-            fs::write(filepath, serde_json::to_string_pretty(&json).map_err(e!())?)
-                .map_err(e!())?;
+            fs::write(filepath, serde_json::to_string_pretty(&json).map_err(e!())?).map_err(e!())?;
             println!("Fill in {} with the given fields", filepath);
             process::exit(0)
         }

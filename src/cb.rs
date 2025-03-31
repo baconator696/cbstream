@@ -23,10 +23,7 @@ impl Cb {
     }
     /// downloads the latest playlist
     fn get_playlist(&mut self) -> Result<()> {
-        let url = format!(
-            "https://chaturbate.com/api/chatvideocontext/{}/",
-            self.username
-        );
+        let url = format!("https://chaturbate.com/api/chatvideocontext/{}/", self.username);
         let json_raw = match util::get_retry(&url, 5).map_err(s!()) {
             Ok(r) => r,
             _ => {
@@ -70,11 +67,7 @@ impl ModelInfo for Cb {
         Ok(self.playlist_link.is_some())
     }
     fn is_finished(&self) -> bool {
-        if let Some(h) = &self.thread_handle {
-            h.is_finished()
-        } else {
-            true
-        }
+        if let Some(h) = &self.thread_handle { h.is_finished() } else { true }
     }
     fn clean_handle(&mut self) -> Result<()> {
         if let Some(h) = self.thread_handle.take() {
@@ -208,11 +201,7 @@ impl ManagePlaylist for Playlist {
         }
         streams.reverse();
         // gets os slash
-        let slash = if cfg!(target_os = "windows") {
-            "\\"
-        } else {
-            "/"
-        };
+        let slash = if cfg!(target_os = "windows") { "\\" } else { "/" };
         // creates output directory, places in current directory
         match fs::create_dir(&self.username) {
             Err(r) => {
@@ -223,18 +212,9 @@ impl ManagePlaylist for Playlist {
             _ => (),
         };
         // creates filename
-        let filename = format!(
-            "{}{}{}.ts",
-            &self.username,
-            slash,
-            streams[0].read().map_err(s!())?.filename
-        );
+        let filename = format!("{}{}{}.ts", &self.username, slash, streams[0].read().map_err(s!())?.filename);
         // creates file
-        let mut file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(filename)
-            .map_err(e!())?;
+        let mut file = fs::OpenOptions::new().create(true).append(true).open(filename).map_err(e!())?;
         // muxes stream to file
         for stream in streams {
             let s = &mut (*stream.write().map_err(s!())?);
