@@ -183,7 +183,7 @@ impl ManagePlaylist for ScvrPlaylist {
                         None => continue,
                     };
                     let id = 0;
-                    let filepath = format!("{}{}-{}.mp4h", temp_dir, self.pl.username, id);
+                    let filepath = format!("{}scvr-{}-{}.mp4h", temp_dir, self.pl.username, id);
                     streams.push(Stream::new(&filename, mp4_header_url.unwrap(), id, &filepath));
                     self.mp4_header = true;
                 }
@@ -202,7 +202,7 @@ impl ManagePlaylist for ScvrPlaylist {
                     }
                     None => break,
                 };
-                let filepath = format!("{}{}-{}.mp4s", temp_dir, self.pl.username, id);
+                let filepath = format!("{}scvr-{}-{}.mp4s", temp_dir, self.pl.username, id);
                 streams.push(Stream::new(&filename, &url, id, &filepath));
             }
         }

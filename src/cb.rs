@@ -32,7 +32,7 @@ impl CbModel {
             }
         };
         let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
-        let playlist_url = json["hls_source"].as_str().unwrap();
+        let playlist_url = json["hls_source"].as_str().ok_or_else(o!())?;
         if playlist_url.len() == 0 {
             self.playlist_link = None;
             return Ok(());
@@ -126,6 +126,26 @@ impl ManagePlaylist for CbPlaylist {
         Ok(())
     }
     fn parse_playlist(&mut self) -> Result<Vec<Stream>> {
+        // determines temp directory
+        let temp_dir = if cfg!(target_os = "windows") {
+            let t = env::var("TEMP").map_err(e!())?;
+            format!("{}\\cbstream\\", t)
+        } else {
+            let t = match env::var("TEMP") {
+                Ok(r) => r,
+                _ => format!("/tmp"),
+            };
+            format!("{}/cbstream/", t)
+        };
+        // creates temp directory
+        match fs::create_dir_all(&temp_dir) {
+            Err(e) => {
+                if e.kind() != io::ErrorKind::AlreadyExists {
+                    return Err(e).map_err(e!())?;
+                }
+            }
+            _ => (),
+        }
         let mut streams = Vec::new();
         let mut date: Option<String> = None;
         if let Some(playlist) = &self.0.playlist {
@@ -147,33 +167,13 @@ impl ManagePlaylist for CbPlaylist {
                 let id = line.split("_").last().ok_or_else(o!())?;
                 let n = id.find(".").ok_or_else(o!())?;
                 let id = (&id[..n]).trim().parse::<u32>().map_err(e!())?;
-                // determines temp directory
-                let temp_dir = if cfg!(target_os = "windows") {
-                    let t = env::var("TEMP").map_err(e!())?;
-                    format!("{}\\cbstream\\", t)
-                } else {
-                    let t = match env::var("TEMP") {
-                        Ok(r) => r,
-                        _ => format!("/tmp"),
-                    };
-                    format!("{}/cbstream/", t)
-                };
-                // creates temp directory
-                match fs::create_dir_all(&temp_dir) {
-                    Err(e) => {
-                        if e.kind() != io::ErrorKind::AlreadyExists {
-                            return Err(e).map_err(e!())?;
-                        }
-                    }
-                    _ => (),
-                }
                 let filename = match &date {
                     Some(date) => {
                         format!("CB_{}_{}", self.0.username, date)
                     }
                     None => break,
                 };
-                let filepath = format!("{}{}-{}.ts", temp_dir, self.0.username, id);
+                let filepath = format!("{}cb-{}-{}.ts", temp_dir, self.0.username, id);
                 streams.push(Stream::new(&filename, &url, id, &filepath));
             }
         }
