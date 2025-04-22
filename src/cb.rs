@@ -125,7 +125,7 @@ impl ManagePlaylist for CbPlaylist {
         self.mux_streams()?;
         Ok(())
     }
-    fn parse_playlist(&self) -> Result<Vec<Stream>> {
+    fn parse_playlist(&mut self) -> Result<Vec<Stream>> {
         let mut streams = Vec::new();
         let mut date: Option<String> = None;
         if let Some(playlist) = &self.0.playlist {

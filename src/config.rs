@@ -1,4 +1,4 @@
-use crate::cb;
+use crate::{cb, sc};
 use crate::{e, o, s};
 use std::collections::HashMap;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
@@ -38,6 +38,8 @@ impl Models {
         let json = parse_json(&self.filepath).map_err(s!())?;
         // reloads CB models from json
         update_internal(&mut self.models, "CB models", &json, cb::CbModel::new).map_err(s!())?;
+        // reloads SC models from json
+        update_internal(&mut self.models, "SC models", &json, sc::ScModel::new).map_err(s!())?;
         Ok(())
     }
 }
@@ -59,6 +61,9 @@ pub fn load(json_path: &str) -> Result<Models> {
     let mut models: HashMap<String, HashMap<String, Box<dyn ModelActions>>> = HashMap::new();
     // loads CB models from json
     let (k, m) = load_internal(&json, "CB models", cb::CbModel::new);
+    models.insert(k, m);
+    // loads SC models from json
+    let (k, m) = load_internal(&json, "SC models", sc::ScModel::new);
     models.insert(k, m);
     Ok(Models {
         filepath: json_path.to_string(),

@@ -7,8 +7,8 @@ type Result<T> = result::Result<T, Box<dyn error::Error>>;
 pub trait ManagePlaylist {
     /// main download loop for the playlist
     fn playlist(&mut self) -> Result<()>;
-    /// parses chaturbate playlist into given streams
-    fn parse_playlist(&self) -> Result<Vec<Stream>>;
+    /// parses playlist into given streams
+    fn parse_playlist(&mut self) -> Result<Vec<Stream>>;
     /// muxes all downloaded streams when stream finishes or is canceled
     fn mux_streams(&mut self) -> Result<()>;
 }
