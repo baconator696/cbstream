@@ -5,13 +5,13 @@ use std::io::{Read, Write};
 use std::sync::{Arc, RwLock};
 use std::{thread::JoinHandle, *};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
-pub struct ScModel {
+pub struct ScvrModel {
     username: String,
     playlist_link: Option<String>,
     thread_handle: Option<JoinHandle<()>>,
     abort: Arc<RwLock<bool>>,
 }
-impl ScModel {
+impl ScvrModel {
     pub fn new(username: &str) -> Self {
         Self {
             username: username.to_string(),
@@ -38,7 +38,7 @@ impl ScModel {
         let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
         let model_id = json["user"]["user"]["id"].as_i64().ok_or_else(o!())?;
         // get largest HLS stream
-        let playlist_url = format!("{}/hls/{}/master/{}_auto.m3u8", hls_prefix, model_id, model_id);
+        let playlist_url = format!("{}/hls/{}_vr/master/{}_vr_auto.m3u8", hls_prefix, model_id, model_id);
         let playlist = match util::get_retry(&playlist_url, 1).map_err(s!()) {
             Ok(r) => r,
             _ => {
@@ -57,7 +57,7 @@ impl ScModel {
         return Ok(());
     }
 }
-impl ModelActions for ScModel {
+impl ModelActions for ScvrModel {
     fn is_online(&mut self) -> Result<bool> {
         self.get_playlist().map_err(s!())?;
         Ok(self.playlist_link.is_some())
@@ -77,7 +77,7 @@ impl ModelActions for ScModel {
         let a = self.abort.clone();
         let p = self.playlist_link.clone().ok_or_else(o!())?;
         let handle: thread::JoinHandle<()> = thread::spawn(move || {
-            ScPlaylist::new(u, p, a).playlist().unwrap();
+            ScvrPlaylist::new(u, p, a).playlist().unwrap();
         });
         if let Some(h) = self.thread_handle.replace(handle) {
             h.join().map_err(h!())?;
@@ -89,19 +89,19 @@ impl ModelActions for ScModel {
         Ok(())
     }
 }
-struct ScPlaylist {
+struct ScvrPlaylist {
     pl: Playlist,
     mp4_header: bool,
 }
-impl ScPlaylist {
+impl ScvrPlaylist {
     pub fn new(username: String, playlist_url: String, abort: Arc<RwLock<bool>>) -> Self {
-        ScPlaylist {
+        ScvrPlaylist {
             pl: Playlist::new(username, playlist_url, abort),
             mp4_header: false,
         }
     }
 }
-impl ManagePlaylist for ScPlaylist {
+impl ManagePlaylist for ScvrPlaylist {
     fn playlist(&mut self) -> Result<()> {
         while !self.pl.abort_get().map_err(s!())? && !abort::get().map_err(s!())? {
             if self.pl.update_playlist().is_err() {
@@ -178,7 +178,7 @@ impl ManagePlaylist for ScPlaylist {
                 if mp4_header_url.is_some() && !self.mp4_header {
                     let filename = match &date {
                         Some(date) => {
-                            format!("SC_{}_{}", self.pl.username, date)
+                            format!("SCVR_{}_{}", self.pl.username, date)
                         }
                         None => continue,
                     };
@@ -198,7 +198,7 @@ impl ManagePlaylist for ScPlaylist {
                 let id = (&id[..n]).trim().parse::<u32>().map_err(e!())?;
                 let filename = match &date {
                     Some(date) => {
-                        format!("SC_{}_{}", self.pl.username, date)
+                        format!("SCVR_{}_{}", self.pl.username, date)
                     }
                     None => break,
                 };

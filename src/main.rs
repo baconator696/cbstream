@@ -3,6 +3,7 @@ mod cb;
 mod config;
 mod err;
 mod sc;
+mod scvr;
 mod stream;
 mod util;
 use std::{thread, time::Duration};

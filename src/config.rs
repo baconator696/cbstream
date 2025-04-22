@@ -1,4 +1,4 @@
-use crate::{cb, sc};
+use crate::{cb, sc, scvr};
 use crate::{e, o, s};
 use std::collections::HashMap;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
@@ -40,6 +40,8 @@ impl Models {
         update_internal(&mut self.models, "CB models", &json, cb::CbModel::new).map_err(s!())?;
         // reloads SC models from json
         update_internal(&mut self.models, "SC models", &json, sc::ScModel::new).map_err(s!())?;
+        // reloads SC VR models from json
+        update_internal(&mut self.models, "SC VR models", &json, scvr::ScvrModel::new).map_err(s!())?;
         Ok(())
     }
 }
@@ -64,6 +66,9 @@ pub fn load(json_path: &str) -> Result<Models> {
     models.insert(k, m);
     // loads SC models from json
     let (k, m) = load_internal(&json, "SC models", sc::ScModel::new);
+    models.insert(k, m);
+    // loads SC VR models from json
+    let (k, m) = load_internal(&json, "SC VR models", scvr::ScvrModel::new);
     models.insert(k, m);
     Ok(Models {
         filepath: json_path.to_string(),
@@ -127,7 +132,8 @@ fn parse_json(filepath: &str) -> Result<serde_json::Value> {
             let json = serde_json::json!({
                 "CB models": [],
                 "MFC models": [],
-                "SC models": []
+                "SC models": [],
+                "SC VR models": [],
             });
             fs::write(filepath, serde_json::to_string_pretty(&json).map_err(e!())?).map_err(e!())?;
             println!("Fill in {} with the given fields", filepath);
