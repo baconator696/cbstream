@@ -78,7 +78,13 @@ impl Stream {
     pub fn download(&mut self, last: Option<Arc<RwLock<Stream>>>) -> Result<()> {
         println!("{}_{}", self.filename, self.id);
         self.last = last;
-        let data = util::get_retry_vec(&self.url, 5).map_err(s!())?;
+        let data: Vec<u8> = match util::get_retry_vec(&self.url, 5).map_err(s!()) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("{}", e);
+                return Ok(());
+            }
+        };
         let mut file = fs::File::create_new(&self.filepath).map_err(e!())?;
         file.write_all(&data).map_err(e!())?;
         file.seek(io::SeekFrom::Start(0)).map_err(e!())?;
