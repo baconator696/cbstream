@@ -1,4 +1,3 @@
-LABEL org.opencontainers.image.source https://github.com/baconator696/cbstream
 FROM --platform=linux/amd64 rust AS build
 ARG TARGETPLATFORM
 WORKDIR /build/
@@ -30,6 +29,7 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] ;then\
     echo "Unsupported platform: $TARGETPLATFORM"; exit 1;\
     fi
 FROM scratch
+LABEL org.opencontainers.image.source https://github.com/baconator696/cbstream
 WORKDIR /
 COPY --from=build /target/root /
 COPY --from=build /etc/ssl /etc/ssl
