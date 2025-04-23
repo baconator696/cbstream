@@ -1,3 +1,4 @@
+LABEL org.opencontainers.image.source https://github.com/baconator696/cbstream
 FROM --platform=linux/amd64 rust AS build
 ARG TARGETPLATFORM
 WORKDIR /build/
