@@ -26,7 +26,8 @@ impl CbModel {
         let url = format!("https://chaturbate.com/api/chatvideocontext/{}/", self.username);
         let json_raw = match util::get_retry(&url, 5).map_err(s!()) {
             Ok(r) => r,
-            _ => {
+            Err(e) => {
+                eprintln!("{}", e);
                 self.playlist_link = None;
                 return Ok(());
             }
@@ -45,10 +46,18 @@ impl CbModel {
             };
         }
         if playlist_url.len() < n {
+            eprintln!("{}", Err::<(), String>("find-prefix-error".into()).map_err(s!()).unwrap_err());
             return Ok(());
         }
         let prefix = &playlist_url[..n];
-        let playlist = util::get_retry(&playlist_url, 5).map_err(s!())?;
+        let playlist = match util::get_retry(&playlist_url, 5).map_err(s!()) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("{}", e);
+                self.playlist_link = None;
+                return Ok(());
+            }
+        };
         let mut split: Vec<&str> = playlist.split("\n").collect();
         split.reverse();
         for line in split {

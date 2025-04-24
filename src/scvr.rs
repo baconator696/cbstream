@@ -41,7 +41,8 @@ impl ScvrModel {
         let playlist_url = format!("{}/hls/{}_vr/master/{}_vr_auto.m3u8", hls_prefix, model_id, model_id);
         let playlist = match util::get_retry(&playlist_url, 1).map_err(s!()) {
             Ok(r) => r,
-            _ => {
+            Err(e) => {
+                eprintln!("{}", e);
                 self.playlist_link = None;
                 return Ok(());
             }

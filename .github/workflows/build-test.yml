@@ -2,7 +2,7 @@ name: Docker Build
 on:
   push:
     tags:
-      - "rc*"
+      - "t*"
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -23,9 +23,9 @@ jobs:
       - name: Build & Push Image
         run: |
           REPO=${GITHUB_REPOSITORY,,}
-          VERSION=${GITHUB_REF_NAME#rc}
+          VERSION=${GITHUB_REF_NAME#}
           docker buildx build \
           --platform linux/amd64,linux/arm64 \
-          -t ghcr.io/$REPO:latest \
+          -t ghcr.io/$REPO:testing \
           -t ghcr.io/$REPO:$VERSION \
           --push .
