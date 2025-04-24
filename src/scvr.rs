@@ -42,7 +42,6 @@ impl ScvrModel {
         let playlist = match util::get_retry(&playlist_url, 1).map_err(s!()) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("{}", e);
                 self.playlist_link = None;
                 return Ok(());
             }

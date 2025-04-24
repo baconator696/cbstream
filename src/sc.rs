@@ -39,10 +39,9 @@ impl ScModel {
         let model_id = json["user"]["user"]["id"].as_i64().ok_or_else(o!())?;
         // get largest HLS stream
         let playlist_url = format!("{}/hls/{}/master/{}_auto.m3u8", hls_prefix, model_id, model_id);
-        let playlist = match util::get_retry(&playlist_url, 5).map_err(s!()) {
+        let playlist = match util::get_retry(&playlist_url, 1).map_err(s!()) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("{}", e);
                 self.playlist_link = None;
                 return Ok(());
             }
