@@ -38,10 +38,12 @@ impl ScvrModel {
         let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
         let model_id = json["user"]["user"]["id"].as_i64().ok_or_else(o!())?;
         // get largest HLS stream
-        let playlist_url = format!("{}/hls/{}_vr/master/{}_vr_auto.m3u8", hls_prefix, model_id, model_id);
+        let playlist_url = format!("{}/hls/{}_vr/master/{}_vr.m3u8", hls_prefix, model_id, model_id);
+        // below is the transoded streams, (maybe add resolution settings in future)
+        //let playlist_url = format!("{}/hls/{}_vr/master/{}_vr_auto.m3u8", hls_prefix, model_id, model_id);
         let playlist = match util::get_retry(&playlist_url, 1).map_err(s!()) {
             Ok(r) => r,
-            Err(e) => {
+            _ => {
                 self.playlist_link = None;
                 return Ok(());
             }
