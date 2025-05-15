@@ -1,0 +1,233 @@
+use crate::stream::{ManagePlaylist, Playlist, Stream};
+use crate::{abort, config::ModelActions, util};
+use crate::{e, h, o, s};
+use std::io::{Read, Write};
+use std::sync::{Arc, RwLock};
+use std::{thread::JoinHandle, *};
+type Result<T> = result::Result<T, Box<dyn error::Error>>;
+pub struct MfcModel {
+    username: String,
+    playlist_link: Option<String>,
+    thread_handle: Option<JoinHandle<()>>,
+    abort: Arc<RwLock<bool>>,
+}
+impl MfcModel {
+    /// creates Cb struct
+    pub fn new(username: &str) -> Self {
+        Self {
+            username: username.to_string(),
+            playlist_link: None,
+            thread_handle: None,
+            abort: Arc::new(RwLock::new(false)),
+        }
+    }
+    /// downloads the latest playlist
+    fn get_playlist(&mut self) -> Result<()> {
+        let url = format!("https://api-edge.myfreecams.com/usernameLookup/{}", self.username);
+        let json_raw = match util::get_retry(&url, 5).map_err(s!()) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("{}", e);
+                self.playlist_link = None;
+                return Ok(());
+            }
+        };
+        let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
+        let id = match json["result"]["user"]["id"].as_i64() {
+            Some(o) => o,
+            None => {
+                eprintln!("{}", Err::<(), &str>("user not found").map_err(s!()).unwrap_err());
+                self.playlist_link = None;
+                return Ok(());
+            }
+        };
+        let sessions = match json["result"]["user"]["sessions"].as_array() {
+            Some(o) => o,
+            None => {
+                self.playlist_link = None;
+                return Ok(());
+            }
+        };
+        if sessions.len() == 0 {
+            self.playlist_link = None;
+            return Ok(());
+        }
+        let phase = sessions[0]["phase"].as_str().ok_or_else(o!())?;
+        let playform_id = sessions[0]["platform_id"].as_i64().ok_or_else(o!())?;
+        let server_name = sessions[0]["server_name"].as_str().ok_or_else(o!())?;
+        let server_name = server_name.replace("video", "");
+        let playlist_url = format!(
+            "https://edgevideo.myfreecams.com/llhls/NxServer/{}/ngrp:mfc_{}{}{}.f4v_cmaf/playlist_sfm4s.m3u8",
+            server_name, phase, playform_id, id
+        );
+        let playlist = match util::get_retry(&playlist_url, 5).map_err(s!()) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("{}", e);
+                self.playlist_link = None;
+                return Ok(());
+            }
+        };
+        let prefix_split: Vec<&str> = playlist_url.split("/").collect();
+        let prefix = prefix_split.get(..prefix_split.len() - 1).ok_or_else(o!())?.join("/");
+        for line in playlist.lines() {
+            if line.len() < 5 || &line[..1] == "#" {
+                continue;
+            }
+            self.playlist_link = Some(format!("{}/{}", prefix, line));
+            break;
+        }
+        return Ok(());
+    }
+}
+impl ModelActions for MfcModel {
+    fn is_online(&mut self) -> Result<bool> {
+        self.get_playlist().map_err(s!())?;
+        Ok(self.playlist_link.is_some())
+    }
+    fn is_finished(&self) -> bool {
+        if let Some(h) = &self.thread_handle { h.is_finished() } else { true }
+    }
+    fn clean_handle(&mut self) -> Result<()> {
+        if let Some(h) = self.thread_handle.take() {
+            Ok(h.join().map_err(h!())?)
+        } else {
+            Ok(())
+        }
+    }
+    fn download(&mut self) -> Result<()> {
+        let u = self.username.clone();
+        let a = self.abort.clone();
+        let p = self.playlist_link.clone().ok_or_else(o!())?;
+        let handle: thread::JoinHandle<()> = thread::spawn(move || {
+            MfcPlaylist::new(u, p, a).playlist().unwrap();
+        });
+        if let Some(h) = self.thread_handle.replace(handle) {
+            h.join().map_err(h!())?;
+        }
+        Ok(())
+    }
+    fn abort(&self) -> Result<()> {
+        *self.abort.write().map_err(s!())? = true;
+        Ok(())
+    }
+}
+struct MfcPlaylist(Playlist);
+impl MfcPlaylist {
+    pub fn new(username: String, playlist_url: String, abort: Arc<RwLock<bool>>) -> Self {
+        MfcPlaylist(Playlist::new(username, playlist_url, abort))
+    }
+}
+impl ManagePlaylist for MfcPlaylist {
+    fn playlist(&mut self) -> Result<()> {
+        while !self.0.abort_get().map_err(s!())? && !abort::get().map_err(s!())? {
+            if self.0.update_playlist().is_err() {
+                break;
+            }
+            for stream in self.parse_playlist().map_err(s!())? {
+                if let Some(last) = &self.0.last_stream {
+                    if stream <= *last.read().map_err(s!())? {
+                        continue;
+                    }
+                }
+                let stream = Arc::new(RwLock::new(stream));
+                let s = stream.clone();
+                let l = self.0.last_stream.clone();
+                thread::spawn(move || {
+                    (*s.write().unwrap()).download(l).unwrap();
+                });
+                self.0.last_stream = Some(stream);
+                thread::sleep(time::Duration::from_millis(500));
+            }
+            thread::sleep(time::Duration::from_millis(1500));
+        }
+        self.mux_streams()?;
+        Ok(())
+    }
+    fn parse_playlist(&mut self) -> Result<Vec<Stream>> {
+        // determines temp directory
+        let temp_dir = if cfg!(target_os = "windows") {
+            let t = env::var("TEMP").map_err(e!())?;
+            format!("{}\\cbstream\\", t)
+        } else {
+            let t = match env::var("TEMP") {
+                Ok(r) => r,
+                _ => format!("/tmp"),
+            };
+            format!("{}/cbstream/", t)
+        };
+        // creates temp directory
+        match fs::create_dir_all(&temp_dir) {
+            Err(e) => {
+                if e.kind() != io::ErrorKind::AlreadyExists {
+                    return Err(e).map_err(e!())?;
+                }
+            }
+            _ => (),
+        }
+        let mut streams = Vec::new();
+        if let Some(playlist) = &self.0.playlist {
+            for line in playlist.lines() {
+                if line.len() == 0 || &line[..1] == "#" {
+                    continue;
+                }
+                // parses relevant information
+                let url = format!("{}/{}", self.0.url_prefix().map_err(s!())?, line);
+                // parses stream id
+                let id_split = line.split(".").collect::<Vec<&str>>();
+                let id_raw = *id_split.get(id_split.len()-2).ok_or_else(o!())?;
+                let id = id_raw.chars().filter(|c| c.is_ascii_digit()).collect::<String>().parse::<u32>().map_err(e!())?;
+                let filename = format!("MFC_{}_{}", self.0.username, util::date());
+                let filepath = format!("{}mfc-{}-{}.ts", temp_dir, self.0.username, id);
+                streams.push(Stream::new(&filename, &url, id, &filepath));
+            }
+        }
+        Ok(streams)
+    }
+    fn mux_streams(&mut self) -> Result<()> {
+        let mut streams: Vec<sync::Arc<sync::RwLock<Stream>>> = Vec::new();
+        let mut last = match self.0.last_stream.take() {
+            Some(o) => o,
+            None => return Ok(()),
+        };
+        // adds all streams to an iterator
+        loop {
+            streams.push(last.clone());
+            let l = match last.write().map_err(s!())?.last.take() {
+                Some(o) => o,
+                None => break,
+            };
+            last = l;
+        }
+        if streams.len() == 0 {
+            return Ok(());
+        }
+        streams.reverse();
+        // gets os slash
+        let slash = if cfg!(target_os = "windows") { "\\" } else { "/" };
+        // creates output directory, places in current directory
+        match fs::create_dir(&self.0.username) {
+            Err(r) => {
+                if r.kind() != io::ErrorKind::AlreadyExists {
+                    return Err(r).map_err(s!())?;
+                }
+            }
+            _ => (),
+        };
+        // creates filename
+        let filename = format!("{}{}{}.ts", &self.0.username, slash, streams[0].read().map_err(s!())?.filename);
+        // creates file
+        let mut file = fs::OpenOptions::new().create(true).append(true).open(filename).map_err(e!())?;
+        // muxes stream to file
+        for stream in streams {
+            let s = &mut (*stream.write().map_err(s!())?);
+            if let Some(mut f) = s.file.take() {
+                let mut data: Vec<u8> = Vec::new();
+                _ = f.read_to_end(&mut data).map_err(e!())?;
+                file.write_all(&data).map_err(e!())?;
+                fs::remove_file(&s.filepath).map_err(e!())?;
+            }
+        }
+        Ok(())
+    }
+}

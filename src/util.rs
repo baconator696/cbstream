@@ -50,3 +50,17 @@ pub fn get_retry_vec(url: &str, retry: i32) -> Result<Vec<u8>> {
     }
     r
 }
+// returns string in between two strings and returns last index where found
+pub fn _find(search: &str, start: &str, end: &str, i: usize) -> Option<(String, usize)> {
+    let start_loc = search.get(i..)?.find(start)? + i;
+    let offset = start_loc + start.len();
+    let end_loc = search.get(offset..)?.find(end)? + offset;
+    let find = search.get(start_loc..end_loc)?.to_string();
+    let offset = end_loc + end.len();
+    Some((find, offset))
+}
+// returns current date and time in "24-02-29_23-12" format
+pub fn date() -> String {
+    let now = chrono::Local::now();
+    now.format("%y-%m-%d_%H-%M").to_string()
+}

@@ -1,4 +1,4 @@
-use crate::{cb, sc, scvr};
+use crate::{cb, sc, scvr, mfc};
 use crate::{e, o, s};
 use std::collections::HashMap;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
@@ -42,6 +42,8 @@ impl Models {
         update_internal(&mut self.models, "SC models", &json, sc::ScModel::new).map_err(s!())?;
         // reloads SC VR models from json
         update_internal(&mut self.models, "SC VR models", &json, scvr::ScvrModel::new).map_err(s!())?;
+        // reloads MFC models from json
+        update_internal(&mut self.models, "SC VR models", &json, mfc::MfcModel::new).map_err(s!())?;
         Ok(())
     }
 }
@@ -69,6 +71,9 @@ pub fn load(json_path: &str) -> Result<Models> {
     models.insert(k, m);
     // loads SC VR models from json
     let (k, m) = load_internal(&json, "SC VR models", scvr::ScvrModel::new);
+    models.insert(k, m);
+    // loads MFC modeels from json
+    let (k, m) = load_internal(&json, "MFC models", mfc::MfcModel::new);
     models.insert(k, m);
     Ok(Models {
         filepath: json_path.to_string(),

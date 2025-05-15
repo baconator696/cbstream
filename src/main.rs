@@ -2,6 +2,7 @@ mod abort;
 mod cb;
 mod config;
 mod err;
+mod mfc;
 mod sc;
 mod scvr;
 mod stream;
