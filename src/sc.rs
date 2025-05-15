@@ -24,7 +24,14 @@ impl ScModel {
     fn get_playlist(&mut self) -> Result<()> {
         // get hls url prefix
         let url = "https://stripchat.com/api/front/models?primaryTag=girls";
-        let json_raw = util::get_retry(url, 5).map_err(s!())?;
+        let json_raw = match util::get_retry(url, 5).map_err(s!()) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("{}", e);
+                self.playlist_link = None;
+                return Ok(());
+            }
+        };
         let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
         let ref_models = json["models"].as_array().ok_or_else(o!())?;
         if ref_models.len() < 1 {
@@ -34,7 +41,14 @@ impl ScModel {
         let hls_prefix = ref_hls.split("/").collect::<Vec<&str>>()[..3].join("/");
         // get model ID
         let url = format!("https://stripchat.com/api/front/v2/models/username/{}/cam", self.username);
-        let json_raw = util::get_retry(&url, 5).map_err(s!())?;
+        let json_raw = match util::get_retry(&url, 5).map_err(s!()) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("{}", e);
+                self.playlist_link = None;
+                return Ok(());
+            }
+        };
         let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
         let model_id = json["user"]["user"]["id"].as_i64().ok_or_else(o!())?;
         // get largest HLS stream
