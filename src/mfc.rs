@@ -54,7 +54,7 @@ impl MfcModel {
         let phase = sessions[0]["phase"].as_str().ok_or_else(o!())?;
         let playform_id = sessions[0]["platform_id"].as_i64().ok_or_else(o!())?;
         let server_name = sessions[0]["server_name"].as_str().ok_or_else(o!())?;
-        let server_name = server_name.replace("video", "");
+        let server_name = util::remove_non_num(server_name);
         let playlist_url = format!(
             "https://edgevideo.myfreecams.com/llhls/NxServer/{}/ngrp:mfc_{}{}{}.f4v_cmaf/playlist_sfm4s.m3u8",
             server_name, phase, playform_id, id
@@ -155,12 +155,7 @@ impl ManagePlaylist for MfcPlaylist {
                 // parses stream id
                 let id_split = line.split(".").collect::<Vec<&str>>();
                 let id_raw = *id_split.get(id_split.len().saturating_sub(2)).ok_or_else(o!())?;
-                let id = id_raw
-                    .chars()
-                    .filter(|c| c.is_ascii_digit())
-                    .collect::<String>()
-                    .parse::<u32>()
-                    .map_err(e!())?;
+                let id = util::remove_non_num(id_raw).parse::<u32>().map_err(e!())?;
                 let filename = format!("MFC_{}_{}", self.0.username, util::date());
                 let filepath = format!("{}mfc-{}-{}.ts", temp_dir, self.0.username, id);
                 streams.push(Stream::new(&filename, &url, id, &filepath, None));

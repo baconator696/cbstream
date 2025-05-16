@@ -103,3 +103,6 @@ pub fn url_prefix(url: &str) -> Option<&str> {
     }
     url.get(..n)
 }
+pub fn remove_non_num(url: &str) -> String {
+    url.chars().filter(|c| c.is_ascii_digit()).collect::<String>()
+}
