@@ -38,18 +38,8 @@ impl Playlist {
         Ok(())
     }
     /// returns url prefix of playlist url
-    pub fn url_prefix(&self) -> Result<&str> {
-        let mut n = 0;
-        loop {
-            n = match str::find(&self.playlist_url[n + 1..], "/") {
-                Some(m) => m + n + 1,
-                None => break,
-            };
-        }
-        if self.playlist_url.len() < n {
-            return Err("url parsing error").map_err(s!())?;
-        }
-        Ok(&self.playlist_url[..n])
+    pub fn url_prefix(&self) -> Option<&str> {
+        util::url_prefix(&self.playlist_url)
     }
     pub fn abort_get(&self) -> Result<bool> {
         Ok(*self.abort.read().map_err(s!())?)

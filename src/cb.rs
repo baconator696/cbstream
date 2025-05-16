@@ -23,11 +23,14 @@ impl CbModel {
     }
     /// downloads the latest playlist
     fn get_playlist(&mut self) -> Result<()> {
+        // get model playlist link
         let url = format!("https://chaturbate.com/api/chatvideocontext/{}/", self.username);
-        let json_raw = match util::get_retry(&url, 5).map_err(s!()) {
+        let json_raw = match util::get_retry(&url, 1).map_err(s!()) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("{}", e);
+                if !e.contains("Unauthorized") {
+                    eprintln!("{}", e);
+                }
                 self.playlist_link = None;
                 return Ok(());
             }
@@ -38,18 +41,7 @@ impl CbModel {
             self.playlist_link = None;
             return Ok(());
         }
-        let mut n = 0;
-        loop {
-            n = match str::find(&playlist_url[n + 1..], "/") {
-                Some(m) => m + n + 1,
-                None => break,
-            };
-        }
-        if playlist_url.len() < n {
-            eprintln!("{}", Err::<(), String>("find-prefix-error".into()).map_err(s!()).unwrap_err());
-            return Ok(());
-        }
-        let prefix = &playlist_url[..n];
+        // get playlist of resolutions
         let playlist = match util::get_retry(&playlist_url, 5).map_err(s!()) {
             Ok(r) => r,
             Err(e) => {
@@ -58,13 +50,13 @@ impl CbModel {
                 return Ok(());
             }
         };
-        let mut split: Vec<&str> = playlist.split("\n").collect();
+        let mut split = playlist.lines().collect::<Vec<&str>>();
         split.reverse();
         for line in split {
             if line.len() < 5 || &line[..1] == "#" {
                 continue;
             }
-            self.playlist_link = Some(format!("{}/{}", prefix, line));
+            self.playlist_link = Some(format!("{}/{}", util::url_prefix(playlist_url).ok_or_else(o!())?, line));
             break;
         }
         return Ok(());
@@ -135,26 +127,8 @@ impl ManagePlaylist for CbPlaylist {
         Ok(())
     }
     fn parse_playlist(&mut self) -> Result<Vec<Stream>> {
-        // determines temp directory
-        let temp_dir = if cfg!(target_os = "windows") {
-            let t = env::var("TEMP").map_err(e!())?;
-            format!("{}\\cbstream\\", t)
-        } else {
-            let t = match env::var("TEMP") {
-                Ok(r) => r,
-                _ => format!("/tmp"),
-            };
-            format!("{}/cbstream/", t)
-        };
-        // creates temp directory
-        match fs::create_dir_all(&temp_dir) {
-            Err(e) => {
-                if e.kind() != io::ErrorKind::AlreadyExists {
-                    return Err(e).map_err(e!())?;
-                }
-            }
-            _ => (),
-        }
+        let temp_dir = util::temp_dir().map_err(s!())?;
+        util::create_dir(&temp_dir).map_err(s!())?;
         let mut streams = Vec::new();
         let mut date: Option<String> = None;
         if let Some(playlist) = &self.0.playlist {
@@ -170,8 +144,7 @@ impl ManagePlaylist for CbPlaylist {
                 if line.len() == 0 || &line[..1] == "#" {
                     continue;
                 }
-                // parses relevant information
-                let url = format!("{}/{}", self.0.url_prefix().map_err(s!())?, line);
+                let full_url = format!("{}/{}", self.0.url_prefix().ok_or_else(o!())?, line);
                 // parses stream id
                 let id = line.split("_").last().ok_or_else(o!())?;
                 let n = id.find(".").ok_or_else(o!())?;
@@ -183,7 +156,7 @@ impl ManagePlaylist for CbPlaylist {
                     None => break,
                 };
                 let filepath = format!("{}cb-{}-{}.ts", temp_dir, self.0.username, id);
-                streams.push(Stream::new(&filename, &url, id, &filepath));
+                streams.push(Stream::new(&filename, &full_url, id, &filepath));
             }
         }
         Ok(streams)
@@ -207,19 +180,9 @@ impl ManagePlaylist for CbPlaylist {
             return Ok(());
         }
         streams.reverse();
-        // gets os slash
-        let slash = if cfg!(target_os = "windows") { "\\" } else { "/" };
-        // creates output directory, places in current directory
-        match fs::create_dir(&self.0.username) {
-            Err(r) => {
-                if r.kind() != io::ErrorKind::AlreadyExists {
-                    return Err(r).map_err(s!())?;
-                }
-            }
-            _ => (),
-        };
+        util::create_dir(&self.0.username).map_err(s!())?;
         // creates filename
-        let filename = format!("{}{}{}.ts", &self.0.username, slash, streams[0].read().map_err(s!())?.filename);
+        let filename = format!("{}{}{}.ts", &self.0.username, util::SLASH, streams[0].read().map_err(s!())?.filename);
         // creates file
         let mut file = fs::OpenOptions::new().create(true).append(true).open(filename).map_err(e!())?;
         // muxes stream to file

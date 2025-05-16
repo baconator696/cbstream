@@ -68,13 +68,11 @@ impl MfcModel {
                 return Ok(());
             }
         };
-        let prefix_split: Vec<&str> = playlist_url.split("/").collect();
-        let prefix = prefix_split.get(..prefix_split.len() - 1).ok_or_else(o!())?.join("/");
         for line in playlist.lines() {
             if line.len() < 5 || &line[..1] == "#" {
                 continue;
             }
-            self.playlist_link = Some(format!("{}/{}", prefix, line));
+            self.playlist_link = Some(format!("{}/{}", util::url_prefix(&playlist_url).ok_or_else(o!())?, line));
             break;
         }
         return Ok(());
@@ -145,26 +143,8 @@ impl ManagePlaylist for MfcPlaylist {
         Ok(())
     }
     fn parse_playlist(&mut self) -> Result<Vec<Stream>> {
-        // determines temp directory
-        let temp_dir = if cfg!(target_os = "windows") {
-            let t = env::var("TEMP").map_err(e!())?;
-            format!("{}\\cbstream\\", t)
-        } else {
-            let t = match env::var("TEMP") {
-                Ok(r) => r,
-                _ => format!("/tmp"),
-            };
-            format!("{}/cbstream/", t)
-        };
-        // creates temp directory
-        match fs::create_dir_all(&temp_dir) {
-            Err(e) => {
-                if e.kind() != io::ErrorKind::AlreadyExists {
-                    return Err(e).map_err(e!())?;
-                }
-            }
-            _ => (),
-        }
+        let temp_dir = util::temp_dir().map_err(s!())?;
+        util::create_dir(&temp_dir).map_err(s!())?;
         let mut streams = Vec::new();
         if let Some(playlist) = &self.0.playlist {
             for line in playlist.lines() {
@@ -172,11 +152,16 @@ impl ManagePlaylist for MfcPlaylist {
                     continue;
                 }
                 // parses relevant information
-                let url = format!("{}/{}", self.0.url_prefix().map_err(s!())?, line);
+                let url = format!("{}/{}", self.0.url_prefix().ok_or_else(o!())?, line);
                 // parses stream id
                 let id_split = line.split(".").collect::<Vec<&str>>();
-                let id_raw = *id_split.get(id_split.len()-2).ok_or_else(o!())?;
-                let id = id_raw.chars().filter(|c| c.is_ascii_digit()).collect::<String>().parse::<u32>().map_err(e!())?;
+                let id_raw = *id_split.get(id_split.len().saturating_sub(2)).ok_or_else(o!())?;
+                let id = id_raw
+                    .chars()
+                    .filter(|c| c.is_ascii_digit())
+                    .collect::<String>()
+                    .parse::<u32>()
+                    .map_err(e!())?;
                 let filename = format!("MFC_{}_{}", self.0.username, util::date());
                 let filepath = format!("{}mfc-{}-{}.ts", temp_dir, self.0.username, id);
                 streams.push(Stream::new(&filename, &url, id, &filepath));
@@ -203,19 +188,10 @@ impl ManagePlaylist for MfcPlaylist {
             return Ok(());
         }
         streams.reverse();
-        // gets os slash
-        let slash = if cfg!(target_os = "windows") { "\\" } else { "/" };
         // creates output directory, places in current directory
-        match fs::create_dir(&self.0.username) {
-            Err(r) => {
-                if r.kind() != io::ErrorKind::AlreadyExists {
-                    return Err(r).map_err(s!())?;
-                }
-            }
-            _ => (),
-        };
+        util::create_dir(&self.0.username).map_err(s!())?;
         // creates filename
-        let filename = format!("{}{}{}.ts", &self.0.username, slash, streams[0].read().map_err(s!())?.filename);
+        let filename = format!("{}{}{}.ts", &self.0.username, util::SLASH, streams[0].read().map_err(s!())?.filename);
         // creates file
         let mut file = fs::OpenOptions::new().create(true).append(true).open(filename).map_err(e!())?;
         // muxes stream to file

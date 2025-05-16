@@ -1,5 +1,5 @@
 use crate::stream::{ManagePlaylist, Playlist, Stream};
-use crate::{abort, config::ModelActions, util};
+use crate::{abort, config::ModelActions, sc,util};
 use crate::{e, h, o, s};
 use std::io::{Read, Write};
 use std::sync::{Arc, RwLock};
@@ -22,55 +22,8 @@ impl ScvrModel {
     }
     /// downloads the latest playlist
     fn get_playlist(&mut self) -> Result<()> {
-        // get hls url prefix
-        let url = "https://stripchat.com/api/front/models?primaryTag=girls";
-        let json_raw = match util::get_retry(url, 5).map_err(s!()) {
-            Ok(r) => r,
-            Err(e) => {
-                eprintln!("{}", e);
-                self.playlist_link = None;
-                return Ok(());
-            }
-        };
-        let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
-        let ref_models = json["models"].as_array().ok_or_else(o!())?;
-        if ref_models.len() < 1 {
-            return Err("stripchat models api not as expected".into());
-        }
-        let ref_hls = ref_models[0]["hlsPlaylist"].as_str().ok_or_else(o!())?;
-        let hls_prefix = ref_hls.split("/").collect::<Vec<&str>>()[..3].join("/");
-        // get model ID
-        let url = format!("https://stripchat.com/api/front/v2/models/username/{}/cam", self.username);
-        let json_raw = match util::get_retry(&url, 5).map_err(s!()) {
-            Ok(r) => r,
-            Err(e) => {
-                eprintln!("{}", e);
-                self.playlist_link = None;
-                return Ok(());
-            }
-        };
-        let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
-        let model_id = json["user"]["user"]["id"].as_i64().ok_or_else(o!())?;
-        // get largest HLS stream
-        let playlist_url = format!("{}/hls/{}_vr/master/{}_vr.m3u8", hls_prefix, model_id, model_id);
-        // below is the transoded streams, (maybe add resolution settings in future)
-        //let playlist_url = format!("{}/hls/{}_vr/master/{}_vr_auto.m3u8", hls_prefix, model_id, model_id);
-        let playlist = match util::get_retry(&playlist_url, 1).map_err(s!()) {
-            Ok(r) => r,
-            _ => {
-                self.playlist_link = None;
-                return Ok(());
-            }
-        };
-        let split: Vec<&str> = playlist.split("\n").collect();
-        for line in split {
-            if line.len() < 5 || &line[..1] == "#" {
-                continue;
-            }
-            self.playlist_link = Some(line.to_string());
-            break;
-        }
-        return Ok(());
+        self.playlist_link = sc::get_playlist(&self.username, true).map_err(s!())?;
+        Ok(())
     }
 }
 impl ModelActions for ScvrModel {
@@ -144,26 +97,8 @@ impl ManagePlaylist for ScvrPlaylist {
         Ok(())
     }
     fn parse_playlist(&mut self) -> Result<Vec<Stream>> {
-        // determines temp directory
-        let temp_dir = if cfg!(target_os = "windows") {
-            let t = env::var("TEMP").map_err(e!())?;
-            format!("{}\\cbstream\\", t)
-        } else {
-            let t = match env::var("TEMP") {
-                Ok(r) => r,
-                _ => format!("/tmp"),
-            };
-            format!("{}/cbstream/", t)
-        };
-        // creates temp directory
-        match fs::create_dir_all(&temp_dir) {
-            Err(e) => {
-                if e.kind() != io::ErrorKind::AlreadyExists {
-                    return Err(e).map_err(e!())?;
-                }
-            }
-            _ => (),
-        }
+        let temp_dir = util::temp_dir().map_err(s!())?;
+        util::create_dir(&temp_dir).map_err(s!())?;
         let mut streams = Vec::new();
         let mut date: Option<String> = None;
         let mut mp4_header_url: Option<&str> = None;
@@ -243,19 +178,9 @@ impl ManagePlaylist for ScvrPlaylist {
             return Ok(());
         }
         streams.reverse();
-        // gets os slash
-        let slash = if cfg!(target_os = "windows") { "\\" } else { "/" };
-        // creates output directory, places in current directory
-        match fs::create_dir(&self.pl.username) {
-            Err(r) => {
-                if r.kind() != io::ErrorKind::AlreadyExists {
-                    return Err(r).map_err(s!())?;
-                }
-            }
-            _ => (),
-        };
+        util::create_dir(&self.pl.username).map_err(s!())?;
         // creates filename
-        let filename = format!("{}{}{}.mp4", &self.pl.username, slash, streams[0].read().map_err(s!())?.filename);
+        let filename = format!("{}{}{}.mp4", &self.pl.username, util::SLASH, streams[0].read().map_err(s!())?.filename);
         // creates file
         let mut file = fs::OpenOptions::new().create(true).append(true).open(filename).map_err(e!())?;
         // muxes stream to file
