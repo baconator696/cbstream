@@ -124,7 +124,7 @@ pub fn get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
     let model_id = json["user"]["user"]["id"].as_i64().ok_or_else(o!())?;
     // get largest HLS stream
     let vr = if vr { "_vr" } else { "" };
-    let playlist_url = format!("{}/hls/{}{}/master/{}{}.m3u8", hls_prefix, vr, model_id, model_id, vr);
+    let playlist_url = format!("{}/hls/{}{}/master/{}{}.m3u8", hls_prefix, model_id, vr, model_id, vr);
     // below is the transoded streams, (maybe add resolution settings in future)
     //let playlist_url = format!("{}/hls/{}_vr/master/{}_vr_auto.m3u8", hls_prefix, model_id, model_id);
     let playlist = match util::get_retry(&playlist_url, 1).map_err(s!()) {

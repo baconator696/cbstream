@@ -1,4 +1,4 @@
-use crate::{cb, sc, scvr, mfc};
+use crate::{cb, mfc, sc, scvr};
 use crate::{e, o, s};
 use std::collections::HashMap;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;

@@ -54,11 +54,10 @@ pub fn get_retry_vec(url: &str, retry: i32) -> Result<Vec<u8>> {
     r
 }
 // returns string in between two strings and returns last index where found
-pub fn _find(search: &str, start: &str, end: &str, i: usize) -> Option<(String, usize)> {
-    let start_loc = search.get(i..)?.find(start)? + i;
-    let offset = start_loc + start.len();
-    let end_loc = search.get(offset..)?.find(end)? + offset;
-    let find = search.get(start_loc..end_loc)?.to_string();
+pub fn _find<'a>(search: &'a str, start: &str, end: &str, i: usize) -> Option<(&'a str, usize)> {
+    let start_loc = search.get(i..)?.find(start)? + i + start.len();
+    let end_loc = search.get(start_loc..)?.find(end)? + start_loc;
+    let find = search.get(start_loc..end_loc)?;
     let offset = end_loc + end.len();
     Some((find, offset))
 }
