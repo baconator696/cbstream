@@ -1,7 +1,6 @@
-use crate::stream::{ManagePlaylist, Playlist, Stream};
+use crate::stream::{self, ManagePlaylist, Playlist, Stream};
 use crate::{abort, config::ModelActions, util};
 use crate::{e, h, o, s};
-use std::io::{Read, Write};
 use std::sync::{Arc, RwLock};
 use std::{thread::JoinHandle, *};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
@@ -97,7 +96,7 @@ impl ModelActions for CbModel {
 struct CbPlaylist(Playlist);
 impl CbPlaylist {
     pub fn new(username: String, playlist_url: String, abort: Arc<RwLock<bool>>) -> Self {
-        CbPlaylist(Playlist::new(username, playlist_url, abort))
+        CbPlaylist(Playlist::new(username, playlist_url, abort, None))
     }
 }
 impl ManagePlaylist for CbPlaylist {
@@ -156,45 +155,12 @@ impl ManagePlaylist for CbPlaylist {
                     None => break,
                 };
                 let filepath = format!("{}cb-{}-{}.ts", temp_dir, self.0.username, id);
-                streams.push(Stream::new(&filename, &full_url, id, &filepath));
+                streams.push(Stream::new(&filename, &full_url, id, &filepath, None));
             }
         }
         Ok(streams)
     }
     fn mux_streams(&mut self) -> Result<()> {
-        let mut streams: Vec<sync::Arc<sync::RwLock<Stream>>> = Vec::new();
-        let mut last = match self.0.last_stream.take() {
-            Some(o) => o,
-            None => return Ok(()),
-        };
-        // adds all streams to an iterator
-        loop {
-            streams.push(last.clone());
-            let l = match last.write().map_err(s!())?.last.take() {
-                Some(o) => o,
-                None => break,
-            };
-            last = l;
-        }
-        if streams.len() == 0 {
-            return Ok(());
-        }
-        streams.reverse();
-        util::create_dir(&self.0.username).map_err(s!())?;
-        // creates filename
-        let filename = format!("{}{}{}.ts", &self.0.username, util::SLASH, streams[0].read().map_err(s!())?.filename);
-        // creates file
-        let mut file = fs::OpenOptions::new().create(true).append(true).open(filename).map_err(e!())?;
-        // muxes stream to file
-        for stream in streams {
-            let s = &mut (*stream.write().map_err(s!())?);
-            if let Some(mut f) = s.file.take() {
-                let mut data: Vec<u8> = Vec::new();
-                _ = f.read_to_end(&mut data).map_err(e!())?;
-                file.write_all(&data).map_err(e!())?;
-                fs::remove_file(&s.filepath).map_err(e!())?;
-            }
-        }
-        Ok(())
+        stream::mux_streams(&mut self.0.last_stream, &self.0.username, "ts")
     }
 }
