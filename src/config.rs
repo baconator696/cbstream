@@ -43,7 +43,7 @@ impl Models {
         // reloads SC VR models from json
         update_internal(&mut self.models, "SC VR models", &json, scvr::ScvrModel::new).map_err(s!())?;
         // reloads MFC models from json
-        update_internal(&mut self.models, "SC VR models", &json, mfc::MfcModel::new).map_err(s!())?;
+        update_internal(&mut self.models, "MFC models", &json, mfc::MfcModel::new).map_err(s!())?;
         Ok(())
     }
 }
