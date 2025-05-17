@@ -39,7 +39,7 @@ pub fn get_retry_vec(url: &str, retry: i32) -> Result<Vec<u8>> {
         let resp = reqwest::blocking::get(url).map_err(e!())?;
         let resp_code = resp.status();
         if resp_code != 200 {
-            return Err(format!("{}|{}", resp.text().map_err(e!())?, resp_code)).map_err(s!())?;
+            return Err(format!("{}|{}", resp.text().map_err(e!())?.trim(), resp_code)).map_err(s!())?;
         }
         Ok(resp.bytes().map_err(e!())?.to_vec())
     };

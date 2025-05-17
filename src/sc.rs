@@ -157,7 +157,13 @@ pub fn parse_playlist(playlist: &Option<String>, mp4_header: &mut Option<Arc<Vec
                         return Err("can not get mp4 header file".into());
                     }
                     let header_url = header_url_split[1];
-                    let header = util::get_retry_vec(header_url, 5).map_err(s!())?;
+                    let header = match util::get_retry_vec(header_url, 5).map_err(s!()) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            eprintln!("{}", e);
+                            return Ok(streams);
+                        }
+                    };
                     *mp4_header = Some(Arc::new(header))
                 }
             }
