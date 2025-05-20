@@ -79,6 +79,9 @@ impl Stream {
                 return Ok(());
             }
         };
+        if data.len() < 10000 {
+            return Ok(());
+        }
         let mut file = fs::File::create_new(&self.filepath).map_err(e!())?;
         if let Some(header) = &self.file_header {
             file.write_all(header).map_err(e!())?;
