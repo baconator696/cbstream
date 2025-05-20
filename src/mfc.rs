@@ -59,7 +59,7 @@ impl MfcModel {
             "https://edgevideo.myfreecams.com/llhls/NxServer/{}/ngrp:mfc_{}{}{}.f4v_cmaf/playlist_sfm4s.m3u8",
             server_name, phase, playform_id, id
         );
-        let playlist = match util::get_retry(&playlist_url, 5).map_err(s!()) {
+        let playlist = match util::get_retry(&playlist_url, 1).map_err(s!()) {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("{}", e);
