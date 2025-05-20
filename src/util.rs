@@ -61,12 +61,12 @@ pub fn _find<'a>(search: &'a str, start: &str, end: &str, i: usize) -> Option<(&
     let offset = end_loc + end.len();
     Some((find, offset))
 }
-// returns current date and time in "24-02-29_23-12" format
+/// returns current date and time in "24-02-29_23-12" format
 pub fn date() -> String {
     let now = chrono::Local::now();
     now.format("%y-%m-%d_%H-%M").to_string()
 }
-// returns temp directory location
+/// returns temp directory location ex. "/tmp/cbstream/""
 pub fn temp_dir() -> Result<String> {
     let temp_dir = if cfg!(target_os = "windows") {
         let t = env::var("TEMP").map_err(e!())?;
@@ -105,4 +105,59 @@ pub fn url_prefix(url: &str) -> Option<&str> {
 }
 pub fn remove_non_num(url: &str) -> String {
     url.chars().filter(|c| c.is_ascii_digit()).collect::<String>()
+}
+/// json file management
+pub struct JsonFile(String);
+impl JsonFile {
+    pub fn new(filepath: String, contents: String) -> Result<Self> {
+        fs::write(&filepath, contents).map_err(e!())?;
+        Ok(JsonFile(filepath))
+    }
+    pub fn str(&self) -> &str {
+        &self.0
+    }
+}
+impl Drop for JsonFile {
+    fn drop(&mut self) {
+        _ = fs::remove_file(&self.0);
+    }
+}
+/// checks if mkvtoolnix is installed and returns path of mkvmuxer
+pub fn mkv_exists() -> Result<String> {
+    let mkv_path = if cfg!(target_os = "windows") {
+        mkv_exists_windows().map_err(s!())?
+    } else {
+        "/bin/mkvmerge".to_string()
+    };
+    if !fs::metadata(&mkv_path).is_ok() {
+        return Err(format!("can't find {}", mkv_path))?;
+    }
+    Ok(mkv_path)
+}
+#[cfg(not(windows))]
+fn mkv_exists_windows() -> Result<String> {
+    Ok(String::new())
+}
+#[cfg(windows)]
+fn mkv_exists_windows() -> Result<String> {
+    use crate::o;
+    use winreg::RegKey;
+    use winreg::enums::*;
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let uninstall_paths = [
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MKVToolNix",
+        r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\MKVToolNix",
+    ];
+    for path in uninstall_paths {
+        let mkv_key = match hklm.open_subkey_with_flags(path, KEY_READ | KEY_WOW64_64KEY) {
+            Ok(r) => r,
+            _ => continue,
+        };
+        let uninstall_string: String = mkv_key.get_value("UninstallString").map_err(e!())?;
+        let dir_split = uninstall_string.split("\\").collect::<Vec<&str>>();
+        let dir = dir_split.get(..dir_split.len() - 1).ok_or_else(o!())?.join("\\");
+        let path = format!("{}\\mkvmerge.exe", dir);
+        return Ok(path);
+    }
+    Ok("C:\\Program Files\\MKVToolNix\\mkvmerge.exe".to_string())
 }

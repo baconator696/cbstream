@@ -128,15 +128,18 @@ pub fn mux_streams(last_stream: &mut Option<Arc<RwLock<Stream>>>, username: &str
     streams.reverse();
     util::create_dir(username).map_err(s!())?;
     // creates filename
-    let filename = format!(
-        "{}{}{}.{}",
-        username,
-        util::SLASH,
-        streams[0].read().map_err(s!())?.filename,
-        file_extension
-    );
+    let filename = streams[0].read().map_err(s!())?.filename.clone();
+    let filepath = format!("{}{}{}", username, util::SLASH, filename);
+    match mkvmerge(&streams, &filepath, &filename) {
+        Ok(_) => return Ok(()),
+        Err(e) => {
+            eprintln!("{}", e);
+        }
+    };
+    // // Local Muxing Fallback // //
+    let filepath = format!("{}.{}", filepath, file_extension);
     // creates file
-    let mut file = fs::OpenOptions::new().create(true).append(true).open(filename).map_err(e!())?;
+    let mut file = fs::OpenOptions::new().create(true).append(true).open(filepath).map_err(e!())?;
     // muxes stream to file
     for stream in streams {
         let s = &mut (*stream.write().map_err(s!())?);
@@ -148,4 +151,28 @@ pub fn mux_streams(last_stream: &mut Option<Arc<RwLock<Stream>>>, username: &str
         }
     }
     Ok(())
+}
+fn mkvmerge(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, filename: &str) -> Result<()> {
+    let mut arg_list: Vec<String> = Vec::with_capacity(streams.len() * 2 + 2);
+    arg_list.push("-o".into());
+    arg_list.push(format!("{}.mkv", filepath));
+    for stream in streams {
+        let s = &(*stream.write().map_err(s!())?);
+        if s.file.is_some() {
+            arg_list.push(s.filepath.clone());
+            arg_list.push("+".into());
+        }
+    }
+    arg_list.pop();
+    let json = serde_json::to_string(&arg_list).map_err(e!())?;
+    let json_filename = format!("{}{}.json", util::temp_dir().map_err(s!())?, filename);
+    let json_file = util::JsonFile::new(json_filename, json).map_err(s!())?;
+    let output = process::Command::new(util::mkv_exists().map_err(s!())?)
+        .arg(format!("@{}", json_file.str()))
+        .output()
+        .map_err(e!())?;
+    if !output.status.success() {
+        return Err(format!("{}", String::from_utf8_lossy(&output.stdout))).map_err(s!())?;
+    }
+    return Ok(());
 }
