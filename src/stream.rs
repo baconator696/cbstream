@@ -172,7 +172,12 @@ fn mkvmerge(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, filename: &str) 
         .output()
         .map_err(e!())?;
     if !output.status.success() {
-        return Err(format!("{}", String::from_utf8_lossy(&output.stdout))).map_err(s!())?;
+        return Err(format!(
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        ))
+        .map_err(s!())?;
     }
     return Ok(());
 }
