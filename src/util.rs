@@ -20,7 +20,7 @@ pub fn get_retry(url: &str, retry: i32) -> Result<String> {
             resp.text().map_err(e!())?
         };
         if resp_code != 200 {
-            return Err(format!("{}", resp_code)).map_err(s!())?;
+            return Err(format!("{}", resp_code))?;
         }
         Ok(resp_text)
     };
@@ -39,7 +39,7 @@ pub fn get_retry_vec(url: &str, retry: i32) -> Result<Vec<u8>> {
         let resp = reqwest::blocking::get(url).map_err(e!())?;
         let resp_code = resp.status();
         if resp_code != 200 {
-            return Err(format!("{}|{}", resp.text().map_err(e!())?.trim(), resp_code)).map_err(s!())?;
+            return Err(format!("{}|{}", resp.text().map_err(e!())?.trim(), resp_code))?;
         }
         Ok(resp.bytes().map_err(e!())?.to_vec())
     };
@@ -145,8 +145,8 @@ fn mkv_exists_windows() -> Result<String> {
     use winreg::enums::*;
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
     let uninstall_paths = [
-        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MKVToolNix",
         r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\MKVToolNix",
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MKVToolNix",
     ];
     for path in uninstall_paths {
         let mkv_key = match hklm.open_subkey_with_flags(path, KEY_READ | KEY_WOW64_64KEY) {
