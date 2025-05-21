@@ -1,5 +1,5 @@
 use crate::util;
-use crate::{e, s};
+use crate::{e, o, s};
 use std::io::{Read, Seek, Write};
 use std::sync::{Arc, RwLock};
 use std::*;
@@ -174,7 +174,7 @@ fn mkvmerge(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, filename: &str) 
         .arg(format!("@{}", json_file.str()))
         .output()
         .map_err(e!())?;
-    if !output.status.success() {
+    if output.status.code().ok_or_else(o!())? == 2 {
         return Err(format!(
             "{}\n{}",
             String::from_utf8_lossy(&output.stderr),
