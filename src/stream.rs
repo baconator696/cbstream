@@ -1,5 +1,5 @@
-use crate::util;
-use crate::{e, o, s};
+use crate::{e, s};
+use crate::{mkv, util};
 use std::io::{Read, Seek, Write};
 use std::sync::{Arc, RwLock};
 use std::*;
@@ -133,7 +133,8 @@ pub fn mux_streams(last_stream: &mut Option<Arc<RwLock<Stream>>>, username: &str
     // creates filename
     let filename = streams[0].read().map_err(s!())?.filename.clone();
     let filepath = format!("{}{}{}", username, util::SLASH, filename);
-    match mkvmerge(&streams, &filepath, &filename) {
+    // tries mkvmerge
+    match mkv::mkvmerge(&streams, &filepath, &filename) {
         Ok(_) => return Ok(()),
         Err(e) => {
             eprintln!("{}", e);
@@ -154,33 +155,4 @@ pub fn mux_streams(last_stream: &mut Option<Arc<RwLock<Stream>>>, username: &str
         }
     }
     Ok(())
-}
-fn mkvmerge(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, filename: &str) -> Result<()> {
-    let mut arg_list: Vec<String> = Vec::with_capacity(streams.len() * 2 + 2);
-    arg_list.push("-o".into());
-    arg_list.push(format!("{}.mkv", filepath));
-    for stream in streams {
-        let s = &(*stream.write().map_err(s!())?);
-        if s.file.is_some() {
-            arg_list.push(s.filepath.clone());
-            arg_list.push("+".into());
-        }
-    }
-    arg_list.pop();
-    let json = serde_json::to_string(&arg_list).map_err(e!())?;
-    let json_filename = format!("{}{}.json", util::temp_dir().map_err(s!())?, filename);
-    let json_file = util::JsonFile::new(json_filename, json).map_err(s!())?;
-    let output = process::Command::new(util::mkv_exists().map_err(s!())?)
-        .arg(format!("@{}", json_file.str()))
-        .output()
-        .map_err(e!())?;
-    if output.status.code().ok_or_else(o!())? == 2 {
-        return Err(format!(
-            "{}\n{}",
-            String::from_utf8_lossy(&output.stderr),
-            String::from_utf8_lossy(&output.stdout)
-        ))
-        .map_err(s!())?;
-    }
-    return Ok(());
 }

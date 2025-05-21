@@ -3,6 +3,7 @@ mod cb;
 mod config;
 mod err;
 mod mfc;
+mod mkv;
 mod sc;
 mod scvr;
 mod stream;
