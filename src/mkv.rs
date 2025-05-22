@@ -77,6 +77,7 @@ pub fn mkvmerge(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, file
         .arg(format!("@{}", json_file.str()))
         .output()
         .map_err(e!())?;
+
     if output.status.code().ok_or_else(o!())? == 2 {
         return Err(format!(
             "{}\n{}",

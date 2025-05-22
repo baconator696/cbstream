@@ -1,50 +1,127 @@
+use crate::{abort, mkv, platform, util};
 use crate::{e, s};
-use crate::{mkv, util};
 use std::io::{Read, Seek, Write};
 use std::sync::{Arc, RwLock};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
-pub trait ManagePlaylist {
-    /// main download loop for the playlist
-    fn playlist(&mut self) -> Result<()>;
-    /// parses playlist into given streams
-    fn parse_playlist(&mut self) -> Result<Vec<Stream>>;
-    /// muxes all downloaded streams when stream finishes or is canceled
-    fn mux_streams(&mut self) -> Result<()>;
-}
 pub struct Playlist {
+    pub platform: platform::Platform,
     pub username: String,
     playlist_url: String,
     pub playlist: Option<String>,
-    pub last_stream: Option<Arc<RwLock<Stream>>>,
+    last_stream: Option<Arc<RwLock<Stream>>>,
     abort: Arc<RwLock<bool>>,
+    downloading: Arc<RwLock<bool>>,
     pub mp4_header: Option<Arc<Vec<u8>>>,
-    //pub muxing_handles: Vec<thread::JoinHandle<()>>,
 }
 impl Playlist {
     /// creates Playlist struct
-    pub fn new(username: String, playlist_url: String, abort: Arc<RwLock<bool>>, mp4_header: Option<Arc<Vec<u8>>>) -> Self {
+    pub fn new(
+        platform: platform::Platform,
+        username: String,
+        playlist_url: String,
+        abort: Arc<RwLock<bool>>,
+        downloading: Arc<RwLock<bool>>,
+        mp4_header: Option<Arc<Vec<u8>>>,
+    ) -> Self {
         Playlist {
+            platform,
             username,
             playlist_url,
             playlist: None,
             last_stream: None,
             abort,
+            downloading,
             mp4_header,
-            //muxing_handles: Vec::new(),
         }
     }
-    /// updates download playlist with url
-    pub fn update_playlist(&mut self) -> Result<()> {
-        self.playlist = Some(util::get_retry(&self.playlist_url, 5).map_err(s!())?);
+    /// updates downloaded playlist with url
+    fn update_playlist(&mut self) -> Result<()> {
+        self.playlist = Some(util::get_retry(&self.playlist_url, 5)?);
         Ok(())
     }
     /// returns url prefix of playlist url
     pub fn url_prefix(&self) -> Option<&str> {
         util::url_prefix(&self.playlist_url)
     }
-    pub fn abort_get(&self) -> Result<bool> {
+    fn abort_get(&self) -> Result<bool> {
         Ok(*self.abort.read().map_err(s!())?)
+    }
+    /// Main Playlist Loop
+    pub fn playlist(&mut self) -> Result<()> {
+        while !self.abort_get().map_err(s!())? && !abort::get().map_err(s!())? {
+            if self.update_playlist().is_err() {
+                break;
+            }
+            for stream in self.parse_playlist().map_err(s!())? {
+                if let Some(last) = &self.last_stream {
+                    if stream <= *last.read().map_err(s!())? {
+                        continue;
+                    }
+                }
+                let stream = Arc::new(RwLock::new(stream));
+                let s = stream.clone();
+                let l = self.last_stream.clone();
+                thread::spawn(move || {
+                    (*s.write().unwrap()).download(l).unwrap();
+                });
+                self.last_stream = Some(stream);
+                thread::sleep(time::Duration::from_millis(500));
+            }
+            thread::sleep(time::Duration::from_millis(1500));
+        }
+        *self.downloading.write().map_err(s!())? = false;
+        self.mux_streams()?;
+        Ok(())
+    }
+    fn parse_playlist(&mut self) -> Result<Vec<Stream>> {
+        platform::parse_playlist(self)
+    }
+    fn mux_streams(&mut self) -> Result<()> {
+        let mut streams: Vec<sync::Arc<sync::RwLock<Stream>>> = Vec::new();
+        let mut last = match self.last_stream.take() {
+            Some(o) => o,
+            None => return Ok(()),
+        };
+        // adds all streams to an iterator
+        loop {
+            streams.push(last.clone());
+            let l = match last.write().map_err(s!())?.last.take() {
+                Some(o) => o,
+                None => break,
+            };
+            last = l;
+        }
+        if streams.len() == 0 {
+            return Ok(());
+        }
+        streams.reverse();
+        util::create_dir(&self.username).map_err(s!())?;
+        // creates filename
+        let filename = streams[0].read().map_err(s!())?.filename.clone();
+        let filepath = format!("{}{}{}", &self.username, util::SLASH, filename);
+        // tries mkvmerge
+        match mkv::mkvmerge(&streams, &filepath, &filename) {
+            Ok(_) => return Ok(()),
+            Err(e) => {
+                eprintln!("{}", e);
+            }
+        };
+        // // Local Muxing Fallback // //
+        let filepath = format!("{}.{}", filepath, platform::platform_extension(&self.platform));
+        // creates file
+        let mut file = fs::OpenOptions::new().create(true).append(true).open(filepath).map_err(e!())?;
+        // muxes stream to file
+        for stream in streams {
+            let s = &mut (*stream.write().map_err(s!())?);
+            if let Some(mut f) = s.file.take() {
+                let mut data: Vec<u8> = Vec::new();
+                _ = f.read_to_end(&mut data).map_err(e!())?;
+                file.write_all(&data).map_err(e!())?;
+                fs::remove_file(&s.filepath).map_err(e!())?;
+            }
+        }
+        Ok(())
     }
 }
 pub struct Stream {
@@ -109,50 +186,4 @@ impl PartialOrd for Stream {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.id.cmp(&other.id))
     }
-}
-pub fn mux_streams(last_stream: &mut Option<Arc<RwLock<Stream>>>, username: &str, file_extension: &str) -> Result<()> {
-    let mut streams: Vec<sync::Arc<sync::RwLock<Stream>>> = Vec::new();
-    let mut last = match last_stream.take() {
-        Some(o) => o,
-        None => return Ok(()),
-    };
-    // adds all streams to an iterator
-    loop {
-        streams.push(last.clone());
-        let l = match last.write().map_err(s!())?.last.take() {
-            Some(o) => o,
-            None => break,
-        };
-        last = l;
-    }
-    if streams.len() == 0 {
-        return Ok(());
-    }
-    streams.reverse();
-    util::create_dir(username).map_err(s!())?;
-    // creates filename
-    let filename = streams[0].read().map_err(s!())?.filename.clone();
-    let filepath = format!("{}{}{}", username, util::SLASH, filename);
-    // tries mkvmerge
-    match mkv::mkvmerge(&streams, &filepath, &filename) {
-        Ok(_) => return Ok(()),
-        Err(e) => {
-            eprintln!("{}", e);
-        }
-    };
-    // // Local Muxing Fallback // //
-    let filepath = format!("{}.{}", filepath, file_extension);
-    // creates file
-    let mut file = fs::OpenOptions::new().create(true).append(true).open(filepath).map_err(e!())?;
-    // muxes stream to file
-    for stream in streams {
-        let s = &mut (*stream.write().map_err(s!())?);
-        if let Some(mut f) = s.file.take() {
-            let mut data: Vec<u8> = Vec::new();
-            _ = f.read_to_end(&mut data).map_err(e!())?;
-            file.write_all(&data).map_err(e!())?;
-            fs::remove_file(&s.filepath).map_err(e!())?;
-        }
-    }
-    Ok(())
 }

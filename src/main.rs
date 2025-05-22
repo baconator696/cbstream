@@ -1,14 +1,12 @@
 mod abort;
-mod cb;
 mod config;
 mod err;
-mod mfc;
 mod mkv;
-mod sc;
-mod scvr;
+mod platform;
+mod platforms;
 mod stream;
 mod util;
-use std::{thread, time::Duration, *};
+use std::{thread, time::Duration};
 
 fn main() {
     let filename = "cb-config.json";
@@ -20,10 +18,7 @@ fn main() {
             if abort::get().unwrap() {
                 break;
             }
-            match models.update_config().map_err(s!()) {
-                Err(e) => eprintln!("{}", e),
-                Ok(r) => r,
-            };
+            models.update_config().unwrap();
         }
     }
 }
