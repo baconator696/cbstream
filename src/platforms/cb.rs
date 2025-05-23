@@ -37,9 +37,9 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
     util::create_dir(&temp_dir).map_err(s!())?;
     let mut streams = Vec::new();
     let mut date: Option<String> = None;
-    if let Some(pl) = &playlist.playlist {
-        for line in pl.lines() {
-            // parses date and time from playlist
+    for line in (playlist.playlist.as_ref()).ok_or_else(o!())?.lines() {
+        // parse date and time
+        if date.is_none() {
             if let Some(n) = line.find("TIME") {
                 if line.len() < 21 {
                     return Err("error parsing date from playlist")?;
@@ -47,25 +47,21 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
                 let t = (&line[n + 7..n + 21]).replace(":", "-").replace("T", "_");
                 date = Some(t);
             }
-            if line.len() == 0 || &line[..1] == "#" {
-                continue;
-            }
-            let full_url = format!("{}/{}", playlist.url_prefix().ok_or_else(o!())?, line);
-            // parses stream id
-            let id = line.split("_").last().ok_or_else(o!())?;
-            let n = id.find(".").ok_or_else(o!())?;
-            let id = (&id[..n]).trim().parse::<u32>().map_err(e!())?;
-            let filename: String;
-            let filepath: String;
-            match &date {
-                Some(date) => {
-                    filename = format!("CB_{}_{}", playlist.username, date);
-                    filepath = format!("{}cb-{}-{}-{}.ts", temp_dir, playlist.username, date, id);
-                }
-                None => break,
-            };
-            streams.push(stream::Stream::new(&filename, &full_url, id, &filepath, None));
         }
+        if line.len() == 0 || &line[..1] == "#" {
+            continue;
+        }
+        let full_url = format!("{}/{}", playlist.url_prefix().ok_or_else(o!())?, line);
+        // parse stream id
+        let id = line.split("_").last().ok_or_else(o!())?;
+        let n = id.find(".").ok_or_else(o!())?;
+        let id = (&id[..n]).trim().parse::<u32>().map_err(e!())?;
+        // parse filenames
+        let date = date.as_ref().ok_or_else(o!())?;
+        let filename = format!("CB_{}_{}", playlist.username, date);
+        let filepath = format!("{}cb-{}-{}-{}.ts", temp_dir, playlist.username, date, id);
+        streams.push(stream::Stream::new(&filename, &full_url, id, &filepath, None));
     }
+
     Ok(streams)
 }

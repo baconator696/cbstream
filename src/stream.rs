@@ -53,7 +53,7 @@ impl Playlist {
             if self.update_playlist().is_err() {
                 break;
             }
-            for stream in self.parse_playlist().map_err(s!())? {
+            for stream in self.parse_playlist() {
                 if let Some(last) = &self.last_stream {
                     if stream <= *last.read().map_err(s!())? {
                         continue;
@@ -74,8 +74,14 @@ impl Playlist {
         self.mux_streams()?;
         Ok(())
     }
-    fn parse_playlist(&mut self) -> Result<Vec<Stream>> {
-        platform::parse_playlist(self)
+    fn parse_playlist(&mut self) -> Vec<Stream> {
+        match platform::parse_playlist(self) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("{}", e);
+                Vec::new()
+            }
+        }
     }
     fn mux_streams(&mut self) -> Result<()> {
         let mut streams: Vec<sync::Arc<sync::RwLock<Stream>>> = Vec::new();

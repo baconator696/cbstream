@@ -45,55 +45,45 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
     util::create_dir(&temp_dir).map_err(s!())?;
     let mut streams = Vec::new();
     let mut date: Option<String> = None;
-    if let Some(pl) = &playlist.playlist {
-        for line in pl.lines() {
-            // parses MP4 header
-            if playlist.mp4_header.is_none() {
-                if line.contains("EXT-X-MAP:URI") {
-                    let header_url_split = line.split("\"").collect::<Vec<&str>>();
-                    if header_url_split.len() < 2 {
-                        return Err("can not get mp4 header file".into());
-                    }
-                    let header_url = header_url_split[1];
-                    let header = match util::get_retry_vec(header_url, 5).map_err(s!()) {
-                        Ok(r) => r,
-                        Err(e) => {
-                            eprintln!("{}", e);
-                            return Ok(streams);
-                        }
-                    };
-                    playlist.mp4_header = Some(Arc::new(header))
+    for line in playlist.playlist.as_ref().ok_or_else(o!())?.lines() {
+        // parse MP4 header
+        if playlist.mp4_header.is_none() {
+            if line.contains("EXT-X-MAP:URI") {
+                // parse header url
+                let header_url_split = line.split("\"").collect::<Vec<&str>>();
+                if header_url_split.len() < 2 {
+                    return Err("can not get mp4 header file".into());
                 }
+                let header_url = header_url_split[1];
+                let header = util::get_retry_vec(header_url, 5).map_err(s!())?;
+                playlist.mp4_header = Some(Arc::new(header))
             }
-            // parses date and time from playlist
-            if date.is_none() {
-                if let Some(n) = line.find("TIME") {
-                    if line.len() < 21 {
-                        return Err("error parsing date from playlist")?;
-                    }
-                    let t = (&line[n + 7..n + 21]).replace(":", "-").replace("T", "_");
-                    date = Some(t);
-                }
-            }
-            if line.len() == 0 || &line[..1] == "#" {
-                continue;
-            }
-            // parses relevant information
-            let url = line.to_string();
-            // parses stream id
-            let id = line.split("_").last().ok_or_else(o!())?;
-            let n = id.find(".").ok_or_else(o!())?;
-            let id = (&id[..n]).trim().parse::<u32>().map_err(e!())?;
-            let vr = if vr { "SCVR" } else { "SC" };
-            let filename = match &date {
-                Some(date) => {
-                    format!("{}_{}_{}", vr, playlist.username, date)
-                }
-                None => break,
-            };
-            let filepath = format!("{}{}-{}-{}.mp4", temp_dir, vr.to_lowercase(), playlist.username, id);
-            streams.push(stream::Stream::new(&filename, &url, id, &filepath, playlist.mp4_header.clone()));
         }
+        // parse date and time from playlist
+        if date.is_none() {
+            if let Some(n) = line.find("TIME") {
+                if line.len() < 21 {
+                    return Err("error parsing date from playlist")?;
+                }
+                let t = (&line[n + 7..n + 21]).replace(":", "-").replace("T", "_");
+                date = Some(t);
+            }
+        }
+        if line.len() == 0 || &line[..1] == "#" {
+            continue;
+        }
+        // parse relevant information
+        let url = line.to_string();
+        // parse stream id
+        let id = line.split("_").last().ok_or_else(o!())?;
+        let n = id.find(".").ok_or_else(o!())?;
+        let id = (&id[..n]).trim().parse::<u32>().map_err(e!())?;
+        // parse filename
+        let vr = if vr { "SCVR" } else { "SC" };
+        let date = date.as_ref().ok_or_else(o!())?;
+        let filename = format!("{}_{}_{}", vr, playlist.username, date);
+        let filepath = format!("{}{}-{}-{}-{}.mp4", temp_dir, vr.to_lowercase(), playlist.username, date, id);
+        streams.push(stream::Stream::new(&filename, &url, id, &filepath, playlist.mp4_header.clone()));
     }
     Ok(streams)
 }

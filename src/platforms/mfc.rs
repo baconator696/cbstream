@@ -41,21 +41,21 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
     let temp_dir = util::temp_dir().map_err(s!())?;
     util::create_dir(&temp_dir).map_err(s!())?;
     let mut streams = Vec::new();
-    if let Some(pl) = &playlist.playlist {
-        for line in pl.lines() {
-            if line.len() == 0 || &line[..1] == "#" {
-                continue;
-            }
-            // parses relevant information
-            let url = format!("{}/{}", playlist.url_prefix().ok_or_else(o!())?, line);
-            // parses stream id
-            let id_split = line.split(".").collect::<Vec<&str>>();
-            let id_raw = *id_split.get(id_split.len().saturating_sub(2)).ok_or_else(o!())?;
-            let id = util::remove_non_num(id_raw).parse::<u32>().map_err(e!())?;
-            let filename = format!("MFC_{}_{}", playlist.username, util::date());
-            let filepath = format!("{}mfc-{}-{}.ts", temp_dir, playlist.username, id);
-            streams.push(stream::Stream::new(&filename, &url, id, &filepath, None));
+    for line in playlist.playlist.as_ref().ok_or_else(o!())?.lines() {
+        if line.len() == 0 || &line[..1] == "#" {
+            continue;
         }
+        // parse relevant information
+        let url = format!("{}/{}", playlist.url_prefix().ok_or_else(o!())?, line);
+        // parse stream id
+        let id_split = line.split(".").collect::<Vec<&str>>();
+        let id_raw = *id_split.get(id_split.len().saturating_sub(2)).ok_or_else(o!())?;
+        let id = util::remove_non_num(id_raw).parse::<u32>().map_err(e!())?;
+        //parse filenames
+        let date = util::date();
+        let filename = format!("MFC_{}_{}", playlist.username, date);
+        let filepath = format!("{}mfc-{}-{}-{}.ts", temp_dir, playlist.username, date, id);
+        streams.push(stream::Stream::new(&filename, &url, id, &filepath, None));
     }
     Ok(streams)
 }
