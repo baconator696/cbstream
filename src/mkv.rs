@@ -59,6 +59,7 @@ fn mkv_exists_windows() -> Result<String> {
     Ok("C:\\Program Files\\MKVToolNix\\mkvmerge.exe".to_string())
 }
 pub fn mkvmerge(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, filename: &str) -> Result<()> {
+    // creates arg list for mkvmerge
     let mut arg_list: Vec<String> = Vec::with_capacity(streams.len() * 2 + 2);
     arg_list.push("-o".into());
     arg_list.push(format!("{}.mkv", filepath));
@@ -73,11 +74,24 @@ pub fn mkvmerge(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, file
     let json = serde_json::to_string(&arg_list).map_err(e!())?;
     let json_filename = format!("{}{}.json", util::temp_dir().map_err(s!())?, filename);
     let json_file = JsonFile::new(json_filename, json).map_err(s!())?;
-    let output = process::Command::new(mkv_exists().map_err(s!())?)
+    // starts mkvmerge process and monitors system memory
+    let mut child = process::Command::new(mkv_exists().map_err(s!())?)
         .arg(format!("@{}", json_file.str()))
-        .output()
+        .stderr(process::Stdio::piped())
+        .stdout(process::Stdio::piped())
+        .spawn()
         .map_err(e!())?;
-
+    let mut sys = sysinfo::System::new_all();
+    while child.try_wait().map_err(e!())?.is_none() {
+        sys.refresh_memory();
+        if sys.available_memory() < 200000000 {
+            child.kill().map_err(e!())?;
+            return Err("not enough memory, killed mkvmerge".into());
+        }
+        thread::sleep(time::Duration::from_millis(200));
+    }
+    // processes output
+    let output = child.wait_with_output().map_err(e!())?;
     if output.status.code().ok_or_else(o!())? == 2 {
         let e = format!(
             "{}:{}",
