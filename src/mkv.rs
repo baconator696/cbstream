@@ -79,12 +79,10 @@ pub fn mkvmerge(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, file
         .map_err(e!())?;
 
     if output.status.code().ok_or_else(o!())? == 2 {
-        return Err(format!(
-            "{}\n{}",
-            String::from_utf8_lossy(&output.stderr),
-            String::from_utf8_lossy(&output.stdout)
-        ))
-        .map_err(s!())?;
+        // temp
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        //
+        return Err(format!("{}", String::from_utf8_lossy(&output.stderr).trim())).map_err(s!())?;
     }
     return Ok(());
 }
