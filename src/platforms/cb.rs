@@ -20,7 +20,7 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
         return Ok(None);
     }
     // get playlist of resolutions
-    let playlist = util::get_retry(&playlist_url, 5).map_err(s!())?;
+    let playlist = util::get_retry(&playlist_url, 1).map_err(s!())?;
     let mut split = playlist.lines().collect::<Vec<&str>>();
     split.reverse();
     for line in split {
