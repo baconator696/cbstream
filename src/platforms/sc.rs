@@ -28,7 +28,10 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
     let playlist_url = format!("{}/hls/{}{}/master/{}{}.m3u8", hls_prefix, model_id, vr, model_id, vr);
     // below is the transoded streams, (maybe add resolution settings in future)
     //let playlist_url = format!("{}/hls/{}_vr/master/{}_vr_auto.m3u8", hls_prefix, model_id, model_id);
-    let playlist = util::get_retry(&playlist_url, 1).map_err(s!())?;
+    let playlist = match util::get_retry(&playlist_url, 1).map_err(s!()) {
+        Ok(r) => r,
+        Err(_) => return Ok(None),
+    };
     for line in playlist.lines() {
         if line.len() < 5 || &line[..1] == "#" {
             continue;
