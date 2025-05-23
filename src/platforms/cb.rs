@@ -6,27 +6,21 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
     // get model playlist link
     let url = format!("https://chaturbate.com/api/chatvideocontext/{}/", username);
     let json_raw = match util::get_retry(&url, 1).map_err(s!()) {
-        Ok(r) => r,
+        Ok(r) => Ok(r),
         Err(e) => {
-            if !e.contains("Unauthorized") {
-                eprintln!("{}", e);
+            if e.contains("Unauthorized") {
+                return Ok(None);
             }
-            return Ok(None);
+            Err(e)
         }
-    };
+    }?;
     let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
     let playlist_url = json["hls_source"].as_str().ok_or_else(o!())?;
     if playlist_url.len() == 0 {
         return Ok(None);
     }
     // get playlist of resolutions
-    let playlist = match util::get_retry(&playlist_url, 5).map_err(s!()) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("{}", e);
-            return Ok(None);
-        }
-    };
+    let playlist = util::get_retry(&playlist_url, 5).map_err(s!())?;
     let mut split = playlist.lines().collect::<Vec<&str>>();
     split.reverse();
     for line in split {

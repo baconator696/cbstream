@@ -35,7 +35,7 @@ impl Models {
             if model.is_downloading().map_err(s!())? {
                 continue;
             }
-            if model.is_online().map_err(s!())? {
+            if model.is_online() {
                 model.download().map_err(s!())?;
             }
             thread::sleep(time::Duration::from_millis(500));

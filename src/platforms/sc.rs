@@ -12,13 +12,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
 pub fn sc_get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
     // get hls url prefix
     let url = "https://stripchat.com/api/front/models?primaryTag=girls";
-    let json_raw = match util::get_retry(url, 5).map_err(s!()) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("{}", e);
-            return Ok(None);
-        }
-    };
+    let json_raw = util::get_retry(url, 5).map_err(s!())?;
     let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
     let ref_hls = json["models"].as_array().ok_or_else(o!())?.get(0).ok_or_else(o!())?["hlsPlaylist"]
         .as_str()
@@ -26,13 +20,7 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
     let hls_prefix = ref_hls.split("/").collect::<Vec<&str>>().get(..3).ok_or_else(o!())?.join("/");
     // get model ID
     let url = format!("https://stripchat.com/api/front/v2/models/username/{}/cam", username);
-    let json_raw = match util::get_retry(&url, 5).map_err(s!()) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("{}", e);
-            return Ok(None);
-        }
-    };
+    let json_raw = util::get_retry(&url, 5).map_err(s!())?;
     let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
     let model_id = json["user"]["user"]["id"].as_i64().ok_or_else(o!())?;
     // get largest HLS stream
@@ -40,14 +28,8 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
     let playlist_url = format!("{}/hls/{}{}/master/{}{}.m3u8", hls_prefix, model_id, vr, model_id, vr);
     // below is the transoded streams, (maybe add resolution settings in future)
     //let playlist_url = format!("{}/hls/{}_vr/master/{}_vr_auto.m3u8", hls_prefix, model_id, model_id);
-    let playlist = match util::get_retry(&playlist_url, 1).map_err(s!()) {
-        Ok(r) => r,
-        _ => {
-            return Ok(None);
-        }
-    };
-    let split = playlist.lines().collect::<Vec<&str>>();
-    for line in split {
+    let playlist = util::get_retry(&playlist_url, 1).map_err(s!())?;
+    for line in playlist.lines() {
         if line.len() < 5 || &line[..1] == "#" {
             continue;
         }

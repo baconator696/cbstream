@@ -4,19 +4,12 @@ use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 pub fn get_playlist(username: &str) -> Result<Option<String>> {
     let url = format!("https://api-edge.myfreecams.com/usernameLookup/{}", username);
-    let json_raw = match util::get_retry(&url, 5).map_err(s!()) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("{}", e);
-            return Ok(None);
-        }
-    };
+    let json_raw = util::get_retry(&url, 5).map_err(s!())?;
     let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
     let id = match json["result"]["user"]["id"].as_i64() {
         Some(o) => o,
         None => {
-            eprintln!("{}", Err::<(), &str>("user not found").map_err(s!()).unwrap_err());
-            return Ok(None);
+            return Err("user not found").map_err(s!())?;
         }
     };
     let sessions = match json["result"]["user"]["sessions"].as_array() {
@@ -34,19 +27,13 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
         "https://edgevideo.myfreecams.com/llhls/NxServer/{}/ngrp:mfc_{}{}{}.f4v_cmaf/playlist_sfm4s.m3u8",
         server_name, phase, playform_id, id
     );
-    let playlist = match util::get_retry(&playlist_url, 1).map_err(s!()) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("{}", e);
-            return Ok(None);
-        }
-    };
+    let playlist = util::get_retry(&playlist_url, 1).map_err(s!())?;
     for line in playlist.lines() {
         if line.len() < 5 || &line[..1] == "#" {
             continue;
         }
-        let playlist_link = Some(format!("{}/{}", util::url_prefix(&playlist_url).ok_or_else(o!())?, line));
-        return Ok(playlist_link);
+        let playlist_link = format!("{}/{}", util::url_prefix(&playlist_url).ok_or_else(o!())?, line);
+        return Ok(Some(playlist_link));
     }
     return Ok(None);
 }

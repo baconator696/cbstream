@@ -34,18 +34,24 @@ impl Model {
         format!("{:?}:{}", self.platform, self.username)
     }
     /// downloads the latest playlist
-    fn get_playlist(&mut self) -> Result<()> {
-        self.playlist_link = match self.platform {
-            Platform::CB => cb::get_playlist(&self.username)?,
-            Platform::MFC => mfc::get_playlist(&self.username)?,
-            Platform::SC => sc::get_playlist(&self.username)?,
-            Platform::SCVR => scvr::get_playlist(&self.username)?,
+    fn get_playlist(&mut self) {
+        let response = match self.platform {
+            Platform::CB => cb::get_playlist(&self.username),
+            Platform::MFC => mfc::get_playlist(&self.username),
+            Platform::SC => sc::get_playlist(&self.username),
+            Platform::SCVR => scvr::get_playlist(&self.username),
         };
-        Ok(())
+        self.playlist_link = match response {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("{}",e);
+                None
+            }
+        }
     }
-    pub fn is_online(&mut self) -> Result<bool> {
-        self.get_playlist().map_err(s!())?;
-        Ok(self.playlist_link.is_some())
+    pub fn is_online(&mut self) -> bool {
+        self.get_playlist();
+        self.playlist_link.is_some()
     }
     pub fn is_downloading(&self) -> Result<bool> {
         Ok(*self.downloading.read().map_err(s!())?)
