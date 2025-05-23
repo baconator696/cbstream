@@ -84,12 +84,14 @@ pub fn temp_dir() -> Result<String> {
 pub fn create_dir(dir: &str) -> Result<()> {
     match fs::create_dir_all(dir) {
         Err(e) => {
-            if e.kind() != io::ErrorKind::AlreadyExists {
-                return Err(e).map_err(e!())?;
+            if e.kind() == io::ErrorKind::AlreadyExists {
+                Ok(())
+            } else {
+                Err(e)
             }
         }
-        _ => (),
-    }
+        Ok(r) => Ok(r),
+    }.map_err(e!())?;
     Ok(())
 }
 // returns url prefix
