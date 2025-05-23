@@ -55,13 +55,15 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
             let id = line.split("_").last().ok_or_else(o!())?;
             let n = id.find(".").ok_or_else(o!())?;
             let id = (&id[..n]).trim().parse::<u32>().map_err(e!())?;
-            let filename = match &date {
+            let filename: String;
+            let filepath: String;
+            match &date {
                 Some(date) => {
-                    format!("CB_{}_{}", playlist.username, date)
+                    filename = format!("CB_{}_{}", playlist.username, date);
+                    filepath = format!("{}cb-{}-{}-{}.ts", temp_dir, playlist.username, date, id);
                 }
                 None => break,
             };
-            let filepath = format!("{}cb-{}-{}.ts", temp_dir, playlist.username, id);
             streams.push(stream::Stream::new(&filename, &full_url, id, &filepath, None));
         }
     }
