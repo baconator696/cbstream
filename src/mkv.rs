@@ -1,8 +1,9 @@
-use crate::{e, o, s};
+use crate::{e, h, o, s};
 use crate::{stream, util};
 use std::sync::{Arc, RwLock};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
+type Hresult<T> = result::Result<T, String>;
 /// json file management
 pub struct JsonFile(String);
 impl JsonFile {
@@ -74,31 +75,48 @@ pub fn mkvmerge(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, file
     let json = serde_json::to_string(&arg_list).map_err(e!())?;
     let json_filename = format!("{}{}.json", util::temp_dir().map_err(s!())?, filename);
     let json_file = JsonFile::new(json_filename, json).map_err(s!())?;
-    // starts mkvmerge process and monitors system memory
+    // starts mkvmerge process
     let mut child = process::Command::new(mkv_exists().map_err(s!())?)
         .arg(format!("@{}", json_file.str()))
+        .arg("-q")
         .stderr(process::Stdio::piped())
         .stdout(process::Stdio::piped())
         .spawn()
         .map_err(e!())?;
+    // read from stderr/stdout pipes
+    use io::Read;
+    let mut stdout = child.stdout.take().ok_or_else(o!())?;
+    let mut stderr = child.stderr.take().ok_or_else(o!())?;
+    let stdout_handle = thread::spawn(move || -> Hresult<String> {
+        let mut out = String::new();
+        stdout.read_to_string(&mut out).map_err(e!())?;
+        Ok(out)
+    });
+    let stderr_handle = thread::spawn(move || -> Hresult<String> {
+        let mut out = String::new();
+        stderr.read_to_string(&mut out).map_err(e!())?;
+        Ok(out)
+    });
+    // monitors system memory
     let mut sys = sysinfo::System::new_all();
-    while child.try_wait().map_err(e!())?.is_none() {
-        sys.refresh_memory();
-        if sys.available_memory() < 200000000 {
-            child.kill().map_err(e!())?;
-            return Err("not enough memory, killed mkvmerge".into());
+    let exit_status = loop {
+        match child.try_wait().map_err(e!())? {
+            Some(o) => break o,
+            None => {
+                sys.refresh_memory();
+                if sys.available_memory() < 200000000 {
+                    child.kill().map_err(e!())?;
+                    return Err("not enough memory, killed mkvmerge".into());
+                }
+                thread::sleep(time::Duration::from_millis(200));
+            }
         }
-        thread::sleep(time::Duration::from_millis(200));
-    }
+    };
+    let stdout = stdout_handle.join().map_err(h!())?.map_err(s!())?;
+    let stderr = stderr_handle.join().map_err(h!())?.map_err(s!())?;
     // processes output
-    let output = child.wait_with_output().map_err(e!())?;
-    if output.status.code().ok_or_else(o!())? == 2 {
-        let e = format!(
-            "{}:{}",
-            String::from_utf8_lossy(&output.stdout).trim(),
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-        return Err(format!("{}", e)).map_err(s!())?;
+    if exit_status.code().ok_or_else(o!())? == 2 {
+        return Err(format!("{}{}", stdout.trim(), stderr.trim())).map_err(s!())?;
     }
     return Ok(());
 }
