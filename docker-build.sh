@@ -42,8 +42,8 @@ if [ "$1" = "linux/arm64" ]; then
         mkdir /target &&
         mv /build/target/aarch64-unknown-linux-gnu/release/cbstream-rust /target/cbstream &&
         mkdir /target/root &&
-        ln -s /usr/lib/aarch64-linux-gnu /target/root/lib &&
-        ln -s /usr/lib/aarch64-linux-gnu /target/root/lib64 &&
+        ln -s /usr/aarch64-linux-gnu/lib /target/root/lib &&
+        ln -s /usr/aarch64-linux-gnu/lib /target/root/lib64 &&
         copy_lib /target/cbstream /target/root/ aarch64-linux-gnu-gcc &&
         mv /bin/ffmpeg /target/ffmpeg &&
         copy_lib /target/ffmpeg /target/root/ aarch64-linux-gnu-gcc &&
