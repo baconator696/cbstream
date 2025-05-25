@@ -43,12 +43,13 @@ impl Models {
         Ok(())
     }
     /// updates Models struct with json
-    pub fn update_config(&mut self) -> Result<()> {
+    pub fn update_config(&mut self) -> Result<bool> {
+        let mut changed = false;
         let mut new_models = match load(&self.config_filepath) {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("{}", e);
-                return Ok(());
+                return Ok(changed);
             }
         };
         let new = &mut new_models.models;
@@ -63,9 +64,10 @@ impl Models {
         for key in new_set.difference(&current_set) {
             if let Some(model) = new.remove(key) {
                 self.add(key.to_string(), model);
+                changed = true;
             }
         }
-        Ok(())
+        Ok(changed)
     }
 }
 impl Drop for Models {
