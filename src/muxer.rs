@@ -27,8 +27,10 @@ fn mkv_exists() -> Result<Option<String>> {
         if fs::metadata(&path).is_ok() { Some(path) } else { None }
     } else {
         let path = "mkvmerge";
-        let output = process::Command::new(path).arg("-V").output().map_err(e!())?;
-        if output.status.success() { Some(path.to_string()) } else { None }
+        match process::Command::new(path).arg("-V").output() {
+            Ok(_) => Some(path.to_string()),
+            Err(_) => None,
+        }
     };
     Ok(path)
 }
@@ -61,8 +63,10 @@ fn mkv_exists_windows() -> Result<String> {
 }
 fn ffmpeg_exists() -> Result<Option<&'static str>> {
     let path = "ffmpeg";
-    let output = process::Command::new(path).arg("-version").output().map_err(e!())?;
-    if output.status.success() { Ok(Some(path)) } else { Ok(None) }
+    match process::Command::new(path).arg("-version").output() {
+        Ok(_) => Ok(Some(path)),
+        Err(_) => Ok(None),
+    }
 }
 fn mkvmerge(mkvmerge_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, filename: &str) -> Result<()> {
     let filepath = format!("{}.mkv", filepath);
