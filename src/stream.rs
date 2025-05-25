@@ -1,6 +1,6 @@
-use crate::{abort, mkv, platform, util};
+use crate::{abort, muxer, platform, util};
 use crate::{e, s};
-use std::io::{Read, Seek, Write};
+use std::io::{Seek, Write};
 use std::sync::{Arc, RwLock};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
@@ -106,27 +106,7 @@ impl Playlist {
         // creates filename
         let filename = streams[0].read().map_err(s!())?.filename.clone();
         let filepath = format!("{}{}{}", &self.username, util::SLASH, filename);
-        // tries mkvmerge
-        match mkv::mkvmerge(&streams, &filepath, &filename) {
-            Ok(_) => return Ok(()),
-            Err(e) => {
-                eprintln!("{}", e);
-            }
-        };
-        // // Local Muxing Fallback // //
-        let filepath = format!("{}.{}", filepath, platform::platform_extension(&self.platform));
-        // creates file
-        let mut file = fs::OpenOptions::new().create(true).append(true).open(filepath).map_err(e!())?;
-        // muxes stream to file
-        for stream in streams {
-            let s = &mut (*stream.write().map_err(s!())?);
-            if let Some(mut f) = s.file.take() {
-                let mut data: Vec<u8> = Vec::new();
-                _ = f.read_to_end(&mut data).map_err(e!())?;
-                file.write_all(&data).map_err(e!())?;
-                fs::remove_file(&s.filepath).map_err(e!())?;
-            }
-        }
+        muxer::muxer(&streams, &filepath, &filename, self.platform.clone())?;
         Ok(())
     }
 }

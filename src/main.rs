@@ -1,7 +1,7 @@
 mod abort;
 mod config;
 mod err;
-mod mkv;
+mod muxer;
 mod platform;
 mod platforms;
 mod stream;
