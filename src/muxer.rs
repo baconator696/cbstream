@@ -196,7 +196,7 @@ fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepat
     let stdout = stdout_handle.join().map_err(h!())?.map_err(s!())?;
     let stderr = stderr_handle.join().map_err(h!())?.map_err(s!())?;
     // processes output
-    if exit_status.code().ok_or_else(o!())? == 2 {
+    if !exit_status.success() {
         return Err(format!("{}{}", stdout.trim(), stderr.trim())).map_err(s!())?;
     }
     return Ok(());
@@ -205,13 +205,13 @@ pub fn muxer(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, filenam
     if let Some(mkvmerge_path) = mkv_exists().map_err(s!())? {
         match mkvmerge(&mkvmerge_path, streams, filepath, filename) {
             Err(e) => eprintln!("{}", e),
-            _ => return Ok(()),
+            Ok(_) => return Ok(()),
         }
     }
     if let Some(ffmpeg_path) = ffmpeg_exists().map_err(s!())? {
         match ffmpeg(ffmpeg_path, streams, filepath, filename) {
             Err(e) => eprintln!("{}", e),
-            _ => return Ok(()),
+            Ok(_) => return Ok(()),
         }
     }
     local_muxer(streams, filepath, pf).map_err(s!())?;
