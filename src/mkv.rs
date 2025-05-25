@@ -102,15 +102,18 @@ pub fn mkvmerge(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, file
     let exit_status = loop {
         match child.try_wait().map_err(e!())? {
             Some(o) => break o,
-            None => {
-                sys.refresh_memory();
-                if sys.available_memory() < 200000000 {
-                    child.kill().map_err(e!())?;
-                    return Err("not enough memory, killed mkvmerge".into());
-                }
-                thread::sleep(time::Duration::from_millis(200));
-            }
+            None => (),
         }
+        sys.refresh_memory();
+        if sys.available_memory() < 200000000 {
+            child.kill().map_err(e!())?;
+            let output_filepath = format!("{}.mkv", filepath);
+            if fs::metadata(&output_filepath).is_ok() {
+                fs::remove_file(output_filepath).map_err(e!())?;
+            }
+            return Err("not enough memory, killed mkvmerge").map_err(s!())?;
+        }
+        thread::sleep(time::Duration::from_millis(200));
     };
     let stdout = stdout_handle.join().map_err(h!())?.map_err(s!())?;
     let stderr = stderr_handle.join().map_err(h!())?.map_err(s!())?;
