@@ -10,5 +10,5 @@ WORKDIR /
 COPY --from=build /target/root /
 COPY --from=build /etc/ssl /etc/ssl
 COPY --from=build /target/cbstream /bin/cbstream
-COPY --from=build /target/mkvmerge /bin/mkvmerge
+COPY --from=build /target/ffmpeg /bin/ffmpeg
 ENTRYPOINT ["cbstream"]
