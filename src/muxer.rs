@@ -5,7 +5,7 @@ use std::sync::{Arc, RwLock};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 type Hresult<T> = result::Result<T, String>;
-/// json file management
+/// file management
 pub struct FileManage(String);
 impl FileManage {
     pub fn new(filepath: String) -> Result<Self> {
@@ -149,6 +149,8 @@ fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepat
     let txt_file = FileManage::new(txt_filepath).map_err(s!())?;
     // starts ffmpeg process
     let mut child = process::Command::new(ffmpeg_path)
+        .arg("-fflags")
+        .arg("+genpts")
         .arg("-f")
         .arg("concat")
         .arg("-safe")
