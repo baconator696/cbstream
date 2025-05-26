@@ -15,10 +15,12 @@ impl Models {
         }
     }
     /// adds a model
-    fn add(&mut self, key: String, model: platform::Model) {
+    fn add(&mut self, key: String, mut model: platform::Model) -> Result<()> {
         if !self.models.contains_key(&key) {
+            model.download().map_err(s!())?;
             self.models.insert(key, model);
         }
+        Ok(())
     }
     /// removes a model
     fn remove(&mut self, key: &str) -> Result<()> {
@@ -31,13 +33,7 @@ impl Models {
     /// checks each model, and starts download if online
     pub fn download(&mut self) -> Result<()> {
         for (_, model) in &mut self.models {
-            model.join_finished_handles().map_err(s!())?;
-            if model.is_downloading().map_err(s!())? {
-                continue;
-            }
-            if model.is_online() {
-                model.download().map_err(s!())?;
-            }
+            model.download().map_err(s!())?;
             thread::sleep(time::Duration::from_millis(500));
         }
         Ok(())
@@ -63,19 +59,11 @@ impl Models {
         // add
         for key in new_set.difference(&current_set) {
             if let Some(model) = new.remove(key) {
-                self.add(key.to_string(), model);
+                self.add(key.to_string(), model).map_err(s!())?;
                 changed = true;
             }
         }
         Ok(changed)
-    }
-}
-impl Drop for Models {
-    /// waits on download handle finish, to allow the thread to mux the downloaded files
-    fn drop(&mut self) {
-        for (_, model) in &mut self.models {
-            model.join_handles()
-        }
     }
 }
 /// Initializes Models struct by loading it with model names from cb-config.json
@@ -89,7 +77,7 @@ pub fn load(json_path: &str) -> Result<Models> {
                     for username in usernames {
                         if let Some(username) = username.as_str() {
                             let model = platform::Model::new(p.clone(), username);
-                            models.add(model.composite_key(), model);
+                            models.add(model.composite_key(), model).map_err(s!())?;
                         }
                     }
                 }

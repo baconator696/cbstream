@@ -49,11 +49,11 @@ impl Model {
             }
         }
     }
-    pub fn is_online(&mut self) -> bool {
+    fn is_online(&mut self) -> bool {
         self.get_playlist();
         self.playlist_link.is_some()
     }
-    pub fn is_downloading(&self) -> Result<bool> {
+    fn is_downloading(&self) -> Result<bool> {
         Ok(*self.downloading.read().map_err(s!())?)
     }
     pub fn join_handles(&mut self) {
@@ -68,7 +68,7 @@ impl Model {
             eprintln!("{}", e)
         }
     }
-    pub fn join_finished_handles(&mut self) -> Result<()> {
+    fn join_finished_handles(&mut self) -> Result<()> {
         let mut errors: Vec<String> = Vec::new();
         for handle in self.thread_handles.drain(..).collect::<Vec<JoinHandle<()>>>() {
             if handle.is_finished() {
@@ -89,7 +89,18 @@ impl Model {
         }
         Ok(())
     }
+    /// main function for downloading a model
     pub fn download(&mut self) -> Result<()> {
+        self.join_finished_handles().map_err(s!())?;
+        if self.is_downloading().map_err(s!())? {
+            return Ok(());
+        }
+        if self.is_online() {
+            self.start_download_thread().map_err(s!())?;
+        }
+        Ok(())
+    }
+    fn start_download_thread(&mut self) -> Result<()> {
         let username = self.username.clone();
         let abort = self.abort.clone();
         let playlist_url = self.playlist_link.clone().ok_or_else(o!())?;
@@ -107,6 +118,11 @@ impl Model {
     pub fn abort(&self) -> Result<()> {
         *self.abort.write().map_err(s!())? = true;
         Ok(())
+    }
+}
+impl Drop for Model {
+    fn drop(&mut self) {
+        self.join_handles()
     }
 }
 pub fn platform_extension(platform: &Platform) -> &'static str {
