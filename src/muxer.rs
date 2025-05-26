@@ -1,5 +1,6 @@
 use crate::{e, h, o, s};
 use crate::{platform, stream, util};
+use platform::Platform;
 use std::io::{Read, Write};
 use std::sync::{Arc, RwLock};
 use std::*;
@@ -205,23 +206,28 @@ fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepat
     }
     return Ok(());
 }
-pub fn muxer(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, filename: &str, pf: platform::Platform) -> Result<()> {
+pub fn muxer(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, filename: &str, pf: Platform) -> Result<()> {
     if let Some(mkvmerge_path) = mkv_exists().map_err(s!())? {
         match mkvmerge(&mkvmerge_path, streams, filepath, filename) {
             Err(e) => eprintln!("{}", e),
             Ok(_) => return Ok(()),
         }
     }
-    if let Some(ffmpeg_path) = ffmpeg_exists().map_err(s!())? {
+    if match pf {
+        Platform::SC => false,
+        Platform::SCVR => false,
+        _ => true,
+    } {
+        if let Some(ffmpeg_path) = ffmpeg_exists().map_err(s!())? {
         match ffmpeg(ffmpeg_path, streams, filepath, filename) {
             Err(e) => eprintln!("{}", e),
             Ok(_) => return Ok(()),
         }
-    }
+    }}
     local_muxer(streams, filepath, pf).map_err(s!())?;
     Ok(())
 }
-fn local_muxer(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, pf: platform::Platform) -> Result<()> {
+fn local_muxer(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, pf: Platform) -> Result<()> {
     let filepath = format!("{}.{}", filepath, platform::platform_extension(&pf));
     // creates file
     let mut file = fs::OpenOptions::new().create(true).append(true).open(filepath).map_err(e!())?;
