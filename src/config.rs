@@ -1,11 +1,11 @@
-use crate::platform;
+use crate::platform::{Model, Platform};
 use crate::{e, s};
 use std::collections::{HashMap, HashSet};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 use std::*;
 pub struct Models {
     config_filepath: String,
-    models: HashMap<String, platform::Model>,
+    models: HashMap<String, Model>,
 }
 impl Models {
     fn new(filepath: &str) -> Self {
@@ -15,7 +15,7 @@ impl Models {
         }
     }
     /// adds a model
-    fn add(&mut self, key: String, model: platform::Model) -> Result<()> {
+    fn add(&mut self, key: String, model: Model) -> Result<()> {
         if !self.models.contains_key(&key) {
             self.models.insert(key, model);
         }
@@ -23,9 +23,9 @@ impl Models {
     }
     /// removes a model
     fn remove(&mut self, key: &str) -> Result<()> {
-        if let Some(mut model) = self.models.remove(key) {
+        if let Some(model) = self.models.remove(key) {
             model.abort().map_err(s!())?;
-            thread::spawn(move || model.join_handles());
+            thread::spawn(move || drop(model));
         }
         Ok(())
     }
@@ -70,11 +70,11 @@ pub fn load(json_path: &str) -> Result<Models> {
     let json = parse_json(json_path).map_err(s!())?;
     if let Some(platforms) = json["platform"].as_object() {
         for (platform, usernames) in platforms {
-            if let Some(p) = platform::load_key(platform) {
+            if let Some(p) = Platform::new(platform) {
                 if let Some(usernames) = usernames.as_array() {
                     for username in usernames {
                         if let Some(username) = username.as_str() {
-                            let model = platform::Model::new(p.clone(), username);
+                            let model = Model::new(p.clone(), username);
                             models.add(model.composite_key(), model).map_err(s!())?;
                         }
                     }

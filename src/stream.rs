@@ -15,7 +15,6 @@ pub struct Playlist {
     pub mp4_header: Option<Arc<Vec<u8>>>,
 }
 impl Playlist {
-    /// creates Playlist struct
     pub fn new(
         platform: platform::Platform,
         username: String,
@@ -75,10 +74,10 @@ impl Playlist {
         Ok(())
     }
     fn parse_playlist(&mut self) -> Vec<Stream> {
-        match platform::parse_playlist(self) {
+        match self.platform.parse_playlist()(self) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("{}", e);
+                eprintln!("{}",e);
                 Vec::new()
             }
         }

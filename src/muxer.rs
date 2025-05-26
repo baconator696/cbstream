@@ -146,8 +146,6 @@ fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepat
     };
     // starts ffmpeg process
     let mut child = process::Command::new(ffmpeg_path)
-        .arg("-protocol_whitelist")
-        .arg("file,pipe")
         .arg("-f")
         .arg(container_type)
         .arg("-i")
@@ -246,7 +244,13 @@ pub fn muxer(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, filenam
 }
 /// Fallback local muxer
 fn local_muxer(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, pf: Platform) -> Result<()> {
-    let filepath = format!("{}.{}", filepath, platform::platform_extension(&pf));
+    let extension = match pf {
+        Platform::CB => "ts",
+        Platform::MFC => "ts",
+        Platform::SC => "mp4",
+        Platform::SCVR => "mp4",
+    };
+    let filepath = format!("{}.{}", filepath, extension);
     // creates file
     let mut file = fs::OpenOptions::new().create(true).append(true).open(filepath).map_err(e!())?;
     // muxes stream to file

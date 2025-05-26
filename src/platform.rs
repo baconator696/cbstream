@@ -1,5 +1,5 @@
 use crate::platforms::{cb, mfc, sc, scvr};
-use crate::stream;
+use crate::stream::{Playlist, Stream};
 use crate::{h, o, s};
 use std::sync::{Arc, RwLock};
 use std::{thread::JoinHandle, *};
@@ -10,6 +10,25 @@ pub enum Platform {
     SC,
     SCVR,
     MFC,
+}
+impl Platform {
+    pub fn parse_playlist(&self) -> fn(&mut Playlist) -> Result<Vec<Stream>> {
+        match self {
+            Self::CB => cb::parse_playlist,
+            Self::MFC => mfc::parse_playlist,
+            Self::SC => sc::parse_playlist,
+            Self::SCVR => scvr::parse_playlist,
+        }
+    }
+    pub fn new(key: &str) -> Option<Self> {
+        match key {
+            "CB" => Some(Self::CB),
+            "MFC" => Some(Self::MFC),
+            "SC" => Some(Self::SC),
+            "SCVR" => Some(Self::SCVR),
+            _ => None,
+        }
+    }
 }
 pub struct Model {
     platform: Platform,
@@ -44,7 +63,7 @@ impl Model {
         self.playlist_link = match response {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("{}",e);
+                eprintln!("{}", e);
                 None
             }
         }
@@ -56,7 +75,7 @@ impl Model {
     fn is_downloading(&self) -> Result<bool> {
         Ok(*self.downloading.read().map_err(s!())?)
     }
-    pub fn join_handles(&mut self) {
+    fn join_handles(&mut self) {
         let mut errors: Vec<String> = Vec::new();
         for handle in self.thread_handles.drain(..) {
             match handle.join().map_err(h!()) {
@@ -108,7 +127,7 @@ impl Model {
         let downloading = self.downloading.clone();
         *downloading.write().map_err(s!())? = true;
         let handle: thread::JoinHandle<()> = thread::spawn(move || {
-            stream::Playlist::new(platform, username, playlist_url, abort, downloading, None)
+            Playlist::new(platform, username, playlist_url, abort, downloading, None)
                 .playlist()
                 .unwrap();
         });
@@ -123,30 +142,5 @@ impl Model {
 impl Drop for Model {
     fn drop(&mut self) {
         self.join_handles()
-    }
-}
-pub fn platform_extension(platform: &Platform) -> &'static str {
-    match platform {
-        Platform::CB => "ts",
-        Platform::MFC => "ts",
-        Platform::SC => "mp4",
-        Platform::SCVR => "mp4",
-    }
-}
-pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Stream>> {
-    match playlist.platform {
-        Platform::CB => cb::parse_playlist(playlist),
-        Platform::MFC => mfc::parse_playlist(playlist),
-        Platform::SC => sc::parse_playlist(playlist),
-        Platform::SCVR => scvr::parse_playlist(playlist),
-    }
-}
-pub fn load_key(key: &str) -> Option<Platform> {
-    match key {
-        "CB" => Some(Platform::CB),
-        "MFC" => Some(Platform::MFC),
-        "SC" => Some(Platform::SC),
-        "SCVR" => Some(Platform::SCVR),
-        _ => None,
     }
 }
