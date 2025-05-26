@@ -150,7 +150,7 @@ fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepat
     // starts ffmpeg process
     let mut child = process::Command::new(ffmpeg_path)
         .arg("-fflags")
-        .arg("+genpts")
+        .arg("+genpts+igndts")
         .arg("-f")
         .arg("concat")
         .arg("-safe")
@@ -159,6 +159,8 @@ fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepat
         .arg(txt_file.filepath())
         .arg("-c")
         .arg("copy")
+        .arg("-avoid_negative_ts")
+        .arg("make_zero")
         .arg(&filepath)
         .stderr(process::Stdio::piped())
         .stdout(process::Stdio::piped())
