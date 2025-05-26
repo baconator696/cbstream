@@ -15,9 +15,8 @@ impl Models {
         }
     }
     /// adds a model
-    fn add(&mut self, key: String, mut model: platform::Model) -> Result<()> {
+    fn add(&mut self, key: String, model: platform::Model) -> Result<()> {
         if !self.models.contains_key(&key) {
-            model.download().map_err(s!())?;
             self.models.insert(key, model);
         }
         Ok(())
@@ -39,13 +38,12 @@ impl Models {
         Ok(())
     }
     /// updates Models struct with json
-    pub fn update_config(&mut self) -> Result<bool> {
-        let mut changed = false;
+    pub fn update_config(&mut self) -> Result<()> {
         let mut new_models = match load(&self.config_filepath) {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("{}", e);
-                return Ok(changed);
+                return Ok(());
             }
         };
         let new = &mut new_models.models;
@@ -58,12 +56,12 @@ impl Models {
         }
         // add
         for key in new_set.difference(&current_set) {
-            if let Some(model) = new.remove(key) {
+            if let Some(mut model) = new.remove(key) {
+                model.download().map_err(s!())?;
                 self.add(key.to_string(), model).map_err(s!())?;
-                changed = true;
             }
         }
-        Ok(changed)
+        Ok(())
     }
 }
 /// Initializes Models struct by loading it with model names from cb-config.json

@@ -18,9 +18,7 @@ fn main() {
             if abort::get().unwrap() {
                 break;
             }
-            if models.update_config().unwrap() {
-                break
-            }
+            models.update_config().unwrap()
         }
     }
 }
