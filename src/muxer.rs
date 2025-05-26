@@ -227,14 +227,14 @@ fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepat
 }
 /// Main Muxing Function
 pub fn muxer(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, filename: &str, pf: Platform) -> Result<()> {
-    if let Some(mkvmerge_path) = mkv_exists().map_err(s!())? {
-        match mkvmerge(&mkvmerge_path, streams, filepath, filename) {
+    if let Some(ffmpeg_path) = ffmpeg_exists().map_err(s!())? {
+        match ffmpeg(ffmpeg_path, streams, filepath, &pf) {
             Err(e) => eprintln!("{}", e),
             Ok(_) => return Ok(()),
         }
     }
-    if let Some(ffmpeg_path) = ffmpeg_exists().map_err(s!())? {
-        match ffmpeg(ffmpeg_path, streams, filepath, &pf) {
+    if let Some(mkvmerge_path) = mkv_exists().map_err(s!())? {
+        match mkvmerge(&mkvmerge_path, streams, filepath, filename) {
             Err(e) => eprintln!("{}", e),
             Ok(_) => return Ok(()),
         }
