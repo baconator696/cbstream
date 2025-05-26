@@ -21,7 +21,7 @@ impl Drop for FileManage {
         _ = fs::remove_file(&self.0);
     }
 }
-/// checks if mkvtoolnix is installed and returns path of mkvmuxer
+/// checks if mkvtoolnix is installed and returns path of mkvmerger
 fn mkv_exists() -> Result<Option<String>> {
     let path = if cfg!(target_os = "windows") {
         let path = mkv_exists_windows().map_err(s!())?;
@@ -69,6 +69,7 @@ fn ffmpeg_exists() -> Result<Option<&'static str>> {
         Err(_) => Ok(None),
     }
 }
+/// muxes streams with mkvmerge
 fn mkvmerge(mkvmerge_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, filename: &str) -> Result<()> {
     let filepath = format!("{}.mkv", filepath);
     // creates arg list for mkvmerge
@@ -134,83 +135,21 @@ fn mkvmerge(mkvmerge_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, fil
     }
     return Ok(());
 }
-fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, filename: &str) -> Result<()> {
+/// muxes streams with ffmpeg pipe
+fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, pf: &Platform) -> Result<()> {
     let filepath = format!("{}.mkv", filepath);
-    // creates file list for ffmpeg
-    let mut file_list = String::new();
-    for stream in streams {
-        let s = &(*stream.read().map_err(s!())?);
-        if s.file.is_some() {
-            let line = format!("file '{}'\n", s.filepath);
-            file_list.push_str(&line);
-        }
-    }
-    let txt_filepath = format!("{}{}.txt", util::temp_dir().map_err(s!())?, filename);
-    fs::write(&txt_filepath, file_list.trim()).map_err(e!())?;
-    let txt_file = FileManage::new(txt_filepath).map_err(s!())?;
-    // starts ffmpeg process
-    let mut child = process::Command::new(ffmpeg_path)
-        .arg("-f")
-        .arg("concat")
-        .arg("-safe")
-        .arg("0")
-        .arg("-i")
-        .arg(txt_file.filepath())
-        .arg("-c")
-        .arg("copy")
-        .arg("-y")
-        .arg(&filepath)
-        .stderr(process::Stdio::piped())
-        .stdout(process::Stdio::piped())
-        .spawn()
-        .map_err(e!())?;
-    // read from stderr/stdout pipes
-    use io::Read;
-    let mut stdout = child.stdout.take().ok_or_else(o!())?;
-    let mut stderr = child.stderr.take().ok_or_else(o!())?;
-    let stdout_handle = thread::spawn(move || -> Hresult<String> {
-        let mut out = String::new();
-        stdout.read_to_string(&mut out).map_err(e!())?;
-        Ok(out)
-    });
-    let stderr_handle = thread::spawn(move || -> Hresult<String> {
-        let mut out = String::new();
-        stderr.read_to_string(&mut out).map_err(e!())?;
-        Ok(out)
-    });
-    // monitors system memory
-    let mut sys = sysinfo::System::new_all();
-    let exit_status = loop {
-        match child.try_wait().map_err(e!())? {
-            Some(o) => break o,
-            None => (),
-        }
-        sys.refresh_memory();
-        if sys.available_memory() < 200000000 {
-            child.kill().map_err(e!())?;
-            if fs::metadata(&filepath).is_ok() {
-                fs::remove_file(filepath).map_err(e!())?;
-            }
-            return Err("not enough memory, killed ffmpeg").map_err(s!())?;
-        }
-        thread::sleep(time::Duration::from_millis(200));
+    let container_type = match pf {
+        Platform::CB => "mpegts",
+        Platform::MFC => "mpegts",
+        Platform::SC => "mp4",
+        Platform::SCVR => "mp4",
     };
-    let stdout = stdout_handle.join().map_err(h!())?.map_err(s!())?;
-    let stderr = stderr_handle.join().map_err(h!())?.map_err(s!())?;
-    // processes output
-    if !exit_status.success() {
-        return Err(format!("{}{}", stdout.trim(), stderr.trim())).map_err(s!())?;
-    }
-    return Ok(());
-}
-fn ffmpeg_mp4dash(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str) -> Result<()> {
-    let filepath = format!("{}.mkv", filepath);
     // starts ffmpeg process
     let mut child = process::Command::new(ffmpeg_path)
         .arg("-protocol_whitelist")
         .arg("file,pipe")
         .arg("-f")
-        .arg("mp4")
+        .arg(container_type)
         .arg("-i")
         .arg("pipe:0")
         .arg("-c")
@@ -258,9 +197,7 @@ fn ffmpeg_mp4dash(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>,
         Ok(exit_status)
     });
     // pipe data into ffmpeg
-    const BUF_SIZE: usize = 1 << 16;
-    let mut buffer = vec![0u8; BUF_SIZE];
-
+    let mut buffer = vec![0u8; 1 << 16];
     'a: for stream in streams {
         let s = &(*stream.read().map_err(s!())?);
         if let Some(f) = s.file.as_ref() {
@@ -299,20 +236,9 @@ pub fn muxer(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, filenam
         }
     }
     if let Some(ffmpeg_path) = ffmpeg_exists().map_err(s!())? {
-        if match pf {
-            Platform::SC => true,
-            Platform::SCVR => true,
-            _ => false,
-        } {
-            match ffmpeg_mp4dash(ffmpeg_path, streams, filepath) {
-                Err(e) => eprintln!("{}", e),
-                Ok(_) => return Ok(()),
-            }
-        } else {
-            match ffmpeg(ffmpeg_path, streams, filepath, filename) {
-                Err(e) => eprintln!("{}", e),
-                Ok(_) => return Ok(()),
-            }
+        match ffmpeg(ffmpeg_path, streams, filepath, &pf) {
+            Err(e) => eprintln!("{}", e),
+            Ok(_) => return Ok(()),
         }
     }
     local_muxer(streams, filepath, pf).map_err(s!())?;
