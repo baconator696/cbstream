@@ -91,7 +91,8 @@ pub fn create_dir(dir: &str) -> Result<()> {
             }
         }
         Ok(r) => Ok(r),
-    }.map_err(e!())?;
+    }
+    .map_err(e!())?;
     Ok(())
 }
 // returns url prefix

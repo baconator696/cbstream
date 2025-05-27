@@ -1,4 +1,4 @@
-use crate::platforms::{cb, mfc, sc, scvr};
+use crate::platforms::*;
 use crate::stream::{Playlist, Stream};
 use crate::{h, o, s};
 use std::sync::{Arc, RwLock};
@@ -12,6 +12,15 @@ pub enum Platform {
     MFC,
 }
 impl Platform {
+    pub fn new(key: &str) -> Option<Self> {
+        match key {
+            "CB" => Some(Self::CB),
+            "MFC" => Some(Self::MFC),
+            "SC" => Some(Self::SC),
+            "SCVR" => Some(Self::SCVR),
+            _ => None,
+        }
+    }
     pub fn parse_playlist(&self) -> fn(&mut Playlist) -> Result<Vec<Stream>> {
         match self {
             Self::CB => cb::parse_playlist,
@@ -20,13 +29,12 @@ impl Platform {
             Self::SCVR => scvr::parse_playlist,
         }
     }
-    pub fn new(key: &str) -> Option<Self> {
-        match key {
-            "CB" => Some(Self::CB),
-            "MFC" => Some(Self::MFC),
-            "SC" => Some(Self::SC),
-            "SCVR" => Some(Self::SCVR),
-            _ => None,
+    fn get_playlist(&self) -> fn(&str) -> Result<Option<String>> {
+        match self {
+            Platform::CB => cb::get_playlist,
+            Platform::MFC => mfc::get_playlist,
+            Platform::SC => sc::get_playlist,
+            Platform::SCVR => scvr::get_playlist,
         }
     }
 }
@@ -52,24 +60,14 @@ impl Model {
     pub fn composite_key(&self) -> String {
         format!("{:?}:{}", self.platform, self.username)
     }
-    /// downloads the latest playlist
-    fn get_playlist(&mut self) {
-        let response = match self.platform {
-            Platform::CB => cb::get_playlist(&self.username),
-            Platform::MFC => mfc::get_playlist(&self.username),
-            Platform::SC => sc::get_playlist(&self.username),
-            Platform::SCVR => scvr::get_playlist(&self.username),
-        };
-        self.playlist_link = match response {
+    fn is_online(&mut self) -> bool {
+        self.playlist_link = match self.platform.get_playlist()(&self.username) {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("{}", e);
                 None
             }
-        }
-    }
-    fn is_online(&mut self) -> bool {
-        self.get_playlist();
+        };
         self.playlist_link.is_some()
     }
     fn is_downloading(&self) -> Result<bool> {

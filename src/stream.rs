@@ -77,7 +77,7 @@ impl Playlist {
         match self.platform.parse_playlist()(self) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("{}",e);
+                eprintln!("{}", e);
                 Vec::new()
             }
         }

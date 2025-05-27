@@ -1,7 +1,9 @@
+use crate::platform::Platform;
+use crate::stream::Stream;
+use crate::util;
 use crate::{e, h, o, s};
-use crate::{platform, stream, util};
-use platform::Platform;
 use std::io::{Read, Write};
+use std::process::ExitStatus;
 use std::sync::{Arc, RwLock};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
@@ -70,7 +72,7 @@ fn ffmpeg_exists() -> Result<Option<&'static str>> {
     }
 }
 /// muxes streams with mkvmerge
-fn mkvmerge(mkvmerge_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, filename: &str) -> Result<()> {
+fn mkvmerge(mkvmerge_path: &str, streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, filename: &str) -> Result<()> {
     let filepath = format!("{}.mkv", filepath);
     // creates arg list for mkvmerge
     let mut arg_list: Vec<String> = Vec::with_capacity(streams.len() * 2 + 2);
@@ -97,7 +99,6 @@ fn mkvmerge(mkvmerge_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, fil
         .spawn()
         .map_err(e!())?;
     // read from stderr/stdout pipes
-    use io::Read;
     let mut stdout = child.stdout.take().ok_or_else(o!())?;
     let mut stderr = child.stderr.take().ok_or_else(o!())?;
     let stdout_handle = thread::spawn(move || -> Hresult<String> {
@@ -136,7 +137,7 @@ fn mkvmerge(mkvmerge_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, fil
     return Ok(());
 }
 /// muxes streams with ffmpeg pipe
-fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, pf: &Platform) -> Result<()> {
+fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, pf: &Platform) -> Result<()> {
     let filepath = format!("{}.mkv", filepath);
     let container_type = match pf {
         Platform::CB => "mpegts",
@@ -160,7 +161,6 @@ fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepat
         .spawn()
         .map_err(e!())?;
     // read from stderr/stdout pipes
-    use io::Read;
     let mut stdout = child.stdout.take().ok_or_else(o!())?;
     let mut stderr = child.stderr.take().ok_or_else(o!())?;
     let mut stdin = child.stdin.take().ok_or_else(o!())?;
@@ -175,7 +175,7 @@ fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepat
         Ok(out)
     });
     // monitors system memory
-    let kill_handle = thread::spawn(move || -> Hresult<process::ExitStatus> {
+    let kill_handle = thread::spawn(move || -> Hresult<ExitStatus> {
         let mut sys = sysinfo::System::new_all();
         let exit_status = loop {
             match child.try_wait().map_err(e!())? {
@@ -226,7 +226,7 @@ fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<stream::Stream>>>, filepat
     return Ok(());
 }
 /// Main Muxing Function
-pub fn muxer(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, filename: &str, pf: Platform) -> Result<()> {
+pub fn muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, filename: &str, pf: Platform) -> Result<()> {
     if let Some(ffmpeg_path) = ffmpeg_exists().map_err(s!())? {
         match ffmpeg(ffmpeg_path, streams, filepath, &pf) {
             Err(e) => eprintln!("{}", e),
@@ -243,7 +243,7 @@ pub fn muxer(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, filenam
     Ok(())
 }
 /// Fallback local muxer
-fn local_muxer(streams: &Vec<Arc<RwLock<stream::Stream>>>, filepath: &str, pf: Platform) -> Result<()> {
+fn local_muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, pf: Platform) -> Result<()> {
     let extension = match pf {
         Platform::CB => "ts",
         Platform::MFC => "ts",
