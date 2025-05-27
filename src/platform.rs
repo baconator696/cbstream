@@ -31,10 +31,10 @@ impl Platform {
     }
     fn get_playlist(&self) -> fn(&str) -> Result<Option<String>> {
         match self {
-            Platform::CB => cb::get_playlist,
-            Platform::MFC => mfc::get_playlist,
-            Platform::SC => sc::get_playlist,
-            Platform::SCVR => scvr::get_playlist,
+            Self::CB => cb::get_playlist,
+            Self::MFC => mfc::get_playlist,
+            Self::SC => sc::get_playlist,
+            Self::SCVR => scvr::get_playlist,
         }
     }
 }
@@ -124,7 +124,7 @@ impl Model {
         let platform = self.platform.clone();
         let downloading = self.downloading.clone();
         *downloading.write().map_err(s!())? = true;
-        let handle: thread::JoinHandle<()> = thread::spawn(move || {
+        let handle = thread::spawn(move || {
             Playlist::new(platform, username, playlist_url, abort, downloading, None)
                 .playlist()
                 .unwrap();
