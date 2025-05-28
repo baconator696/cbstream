@@ -1,10 +1,17 @@
+use crate::platform::Platform;
 use crate::{e, o, s};
 use crate::{stream, util};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 pub fn get_playlist(username: &str) -> Result<Option<String>> {
+    let headers = util::create_headers(serde_json::json!({
+        "user-agent": util::get_useragent().map_err(s!())?,
+        "referer": format!("{}{}",Platform::MFC.referer(),username),
+
+    }))
+    .map_err(s!())?;
     let url = format!("https://api-edge.myfreecams.com/usernameLookup/{}", username);
-    let json_raw = util::get_retry(&url, 5).map_err(s!())?;
+    let json_raw = util::get_retry(&url, 5, Some(&headers)).map_err(s!())?;
     let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
     let id = match json["result"]["user"]["id"].as_i64() {
         Some(o) => o,
@@ -27,7 +34,7 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
         "https://edgevideo.myfreecams.com/llhls/NxServer/{}/ngrp:mfc_{}{}{}.f4v_cmaf/playlist_sfm4s.m3u8",
         server_name, phase, playform_id, id
     );
-    let playlist = util::get_retry(&playlist_url, 1).map_err(s!())?;
+    let playlist = util::get_retry(&playlist_url, 1, Some(&headers)).map_err(s!())?;
     for line in playlist.lines() {
         if line.len() < 5 || &line[..1] == "#" {
             continue;
@@ -55,7 +62,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
         let date = util::date();
         let filename = format!("MFC_{}_{}", playlist.username, date);
         let filepath = format!("{}mfc-{}-{}-{}.ts", temp_dir, playlist.username, date, id);
-        streams.push(stream::Stream::new(&filename, &url, id, &filepath, None));
+        streams.push(stream::Stream::new(&filename, &url, id, &filepath, None, Platform::MFC));
     }
     Ok(streams)
 }

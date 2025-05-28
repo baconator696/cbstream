@@ -36,7 +36,14 @@ impl Playlist {
     }
     /// updates downloaded playlist with url
     fn update_playlist(&mut self) -> Result<()> {
-        self.playlist = Some(util::get_retry(&self.playlist_url, 5)?);
+        let headers = util::create_headers(serde_json::json!({
+            "user-agent": util::get_useragent().map_err(s!())?,
+            "referer": self.platform.referer(),
+
+        }))
+        .map_err(s!())?;
+        let playlist = util::get_retry(&self.playlist_url, 5, Some(&headers))?;
+        self.playlist = Some(playlist);
         Ok(())
     }
     /// returns url prefix of playlist url
@@ -117,9 +124,10 @@ pub struct Stream {
     pub file: Option<fs::File>,
     pub last: Option<Arc<RwLock<Stream>>>,
     file_header: Option<Arc<Vec<u8>>>,
+    platform: platform::Platform,
 }
 impl Stream {
-    pub fn new(filename: &str, url: &str, id: u32, filepath: &str, file_header: Option<Arc<Vec<u8>>>) -> Self {
+    pub fn new(filename: &str, url: &str, id: u32, filepath: &str, file_header: Option<Arc<Vec<u8>>>, platform: platform::Platform) -> Self {
         Self {
             filename: filename.to_string(),
             url: url.to_string(),
@@ -128,13 +136,20 @@ impl Stream {
             file: None,
             last: None,
             file_header,
+            platform,
         }
     }
     /// downloads the stream given the Stream's url
     pub fn download(&mut self, last: Option<Arc<RwLock<Stream>>>) -> Result<()> {
         println!("{}_{}", self.filename, self.id);
         self.last = last;
-        let data: Vec<u8> = match util::get_retry_vec(&self.url, 5).map_err(s!()) {
+        let headers = util::create_headers(serde_json::json!({
+            "user-agent": util::get_useragent().map_err(s!())?,
+            "referer": self.platform.referer(),
+
+        }))
+        .map_err(s!())?;
+        let data: Vec<u8> = match util::get_retry_vec(&self.url, 5, Some(&headers)).map_err(s!()) {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("{}", e);

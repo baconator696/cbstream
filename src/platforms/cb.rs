@@ -1,11 +1,18 @@
+use crate::platform::Platform;
 use crate::{e, o, s};
 use crate::{stream, util};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 pub fn get_playlist(username: &str) -> Result<Option<String>> {
+    let headers = util::create_headers(serde_json::json!({
+        "user-agent": util::get_useragent().map_err(s!())?,
+        "referer": format!("{}{}",Platform::CB.referer(),username),
+
+    }))
+    .map_err(s!())?;
     // get model playlist link
     let url = format!("https://chaturbate.com/api/chatvideocontext/{}/", username);
-    let json_raw = match util::get_retry(&url, 1).map_err(s!()) {
+    let json_raw = match util::get_retry(&url, 1, Some(&headers)).map_err(s!()) {
         Ok(r) => Ok(r),
         Err(e) => {
             if e.contains("Unauthorized") {
@@ -20,7 +27,7 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
         return Ok(None);
     }
     // get playlist of resolutions
-    let playlist = util::get_retry(&playlist_url, 1).map_err(s!())?;
+    let playlist = util::get_retry(&playlist_url, 1, Some(&headers)).map_err(s!())?;
     let mut split = playlist.lines().collect::<Vec<&str>>();
     split.reverse();
     for line in split {
@@ -60,7 +67,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
         let date = date.as_ref().ok_or_else(o!())?;
         let filename = format!("CB_{}_{}", playlist.username, date);
         let filepath = format!("{}cb-{}-{}-{}.ts", temp_dir, playlist.username, date, id);
-        streams.push(stream::Stream::new(&filename, &full_url, id, &filepath, None));
+        streams.push(stream::Stream::new(&filename, &full_url, id, &filepath, None, Platform::CB));
     }
 
     Ok(streams)

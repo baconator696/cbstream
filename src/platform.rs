@@ -37,6 +37,14 @@ impl Platform {
             Self::SCVR => scvr::get_playlist,
         }
     }
+    pub fn referer(&self) -> &'static str {
+        match self {
+            Self::CB => "https://chaturbate.com/",
+            Self::MFC => "https://www.myfreecams.com/",
+            Self::SC => "https://stripchat.com/",
+            Self::SCVR => "https://vr.stripchat.com/",
+        }
+    }
 }
 pub struct Model {
     platform: Platform,
