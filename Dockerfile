@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM rust AS build
+FROM --platform=$BUILDPLATFORM debian:sid AS build
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG TAG

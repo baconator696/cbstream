@@ -32,15 +32,17 @@ fi
 if [ "$1" = "linux/arm64" ]; then
     dpkg --add-architecture arm64 &&
         apt update &&
-        apt install -y gcc-aarch64-linux-gnu libssl-dev:arm64 ffmpeg:arm64 &&
+        apt install -y rustup gcc gcc-aarch64-linux-gnu libssl-dev:arm64 pkg-config ffmpeg:arm64 &&
         cp -rs /usr/lib/aarch64-linux-gnu/* /usr/aarch64-linux-gnu/lib
-    rustup target add aarch64-unknown-linux-gnu &&
+    rustup default stable &&
+        rustup target add aarch64-unknown-linux-gnu &&
         OPENSSL_DIR=/usr/aarch64-linux-gnu \
             CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER="aarch64-linux-gnu-gcc" \
             cargo build -r --target aarch64-unknown-linux-gnu
 elif [ "$1" = "linux/amd64" ]; then
     apt update &&
-        apt install -y gcc libssl-dev pkg-config ffmpeg &&
+        apt install -y rustup gcc libssl-dev pkg-config ffmpeg &&
+        rustup default stable &&
         cargo build -r
 else
     echo "Unsupported platform: $1"
