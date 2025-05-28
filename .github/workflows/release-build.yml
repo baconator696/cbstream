@@ -1,0 +1,24 @@
+name: Release Build
+on:
+  push:
+    tags:
+      - "v*"
+jobs:
+  build:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git Clone
+        uses: actions/checkout@v4
+
+      - name: Build for Windows
+        run: |
+          docker run --rm -t \
+          -v $(pwd):/mnt -w /mnt \
+          rust bash ./windows-build.sh
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            cbstream.exe

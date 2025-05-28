@@ -53,7 +53,8 @@ An optional environment variable `TEMP` can be set to specify where temporary st
 To run the program using Docker, use the following command:
 
 ```bash
-docker run -v <save location>:/cbstream --stop-timeout 300 -itd ghcr.io/baconator696/cbstream:latest
+docker run --name cbstream -v <save location>:/cbstream --stop-timeout 300 -itd ghcr.io/baconator696/cbstream:latest && \
+    docker logs -f cbstream
 ```
 
 - Replace `<save location>` with the directory on your host machine where you want to store downloaded files.
@@ -64,7 +65,7 @@ docker run -v <save location>:/cbstream --stop-timeout 300 -itd ghcr.io/baconato
 ---
 
 ## TODO
-
+- Print version number at start
 - Add support for more streaming platforms
 - Improve request handling to mimic real user behavior
 - Implement the ability to download private shows
