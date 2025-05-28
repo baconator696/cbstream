@@ -12,7 +12,7 @@ jobs:
       - name: Git Clone
         uses: actions/checkout@v4
 
-      - name: Build for Windows
+      - name: Build for Releases
         run: |
           docker run --rm -t \
           -v $(pwd):/mnt -w /mnt \
