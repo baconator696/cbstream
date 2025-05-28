@@ -65,7 +65,6 @@ docker run --name cbstream -v <save location>:/cbstream --stop-timeout 300 -itd 
 ---
 
 ## TODO
-- Print version number at start
 - Add support for more streaming platforms
 - Improve request handling to mimic real user behavior
 - Implement the ability to download private shows

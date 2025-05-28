@@ -16,7 +16,8 @@ jobs:
         run: |
           docker run --rm -t \
           -v $(pwd):/mnt -w /mnt \
-          rust bash ./windows-build.sh
+          -e TAG="${GITHUB_REF#refs/tags/}" \
+          rust bash ./release-build.sh
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
