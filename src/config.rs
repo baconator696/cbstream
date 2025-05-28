@@ -1,5 +1,5 @@
 use crate::platform::{Model, Platform};
-use crate::{e, s};
+use crate::{e, s, util};
 use std::collections::{HashMap, HashSet};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 use std::*;
@@ -82,6 +82,13 @@ pub fn load(json_path: &str) -> Result<Models> {
             }
         }
     }
+    let mut useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
+    if let Some(u) = json["config"]["user-agent"].as_str() {
+        if u.len() != 0 {
+            useragent = u;
+        }
+    }
+    util::set_useragent(useragent.to_string()).map_err(s!())?;
     Ok(models)
 }
 /// parses json from cb-config.json as a serde data
@@ -98,6 +105,9 @@ fn parse_json(filepath: &str) -> Result<serde_json::Value> {
                     "MFC": [],
                     "SCVR": [],
                     "SC": []
+                },
+                "config": {
+                    "user-agent": ""
                 }
             });
             fs::write(filepath, serde_json::to_string_pretty(&json).map_err(e!())?).map_err(e!())?;
