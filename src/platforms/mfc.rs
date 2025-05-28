@@ -56,7 +56,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
         let url = format!("{}/{}", playlist.url_prefix().ok_or_else(o!())?, line);
         // parse stream id
         let id_split = line.split(".").collect::<Vec<&str>>();
-        let id_raw = *id_split.get(id_split.len().saturating_sub(2)).ok_or_else(o!())?;
+        let id_raw = *id_split.get(1).ok_or_else(o!())?;
         let id = util::remove_non_num(id_raw).parse::<u32>().map_err(e!())?;
         //parse filenames
         let date = util::date();
