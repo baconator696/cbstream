@@ -25,6 +25,7 @@ jobs:
           REPO=${GITHUB_REPOSITORY,,}
           VERSION=${GITHUB_REF_NAME#}
           docker buildx build \
+          --build-arg TAG="${GITHUB_REF#refs/tags/}" \
           --platform linux/amd64,linux/arm64 \
           -t ghcr.io/$REPO:testing \
           -t ghcr.io/$REPO:$VERSION \
