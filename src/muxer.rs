@@ -144,6 +144,7 @@ fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str,
         Platform::MFC => "mpegts",
         Platform::SC => "mp4",
         Platform::SCVR => "mp4",
+        Platform::BONGA => "mpegts",
     };
     // starts ffmpeg process
     let mut child = process::Command::new(ffmpeg_path)
@@ -249,6 +250,7 @@ fn local_muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, pf: Platform)
         Platform::MFC => "ts",
         Platform::SC => "mp4",
         Platform::SCVR => "mp4",
+        Platform::BONGA => "ts",
     };
     let filepath = format!("{}.{}", filepath, extension);
     // creates file

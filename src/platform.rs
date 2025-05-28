@@ -10,6 +10,7 @@ pub enum Platform {
     SC,
     SCVR,
     MFC,
+    BONGA,
 }
 impl Platform {
     pub fn new(key: &str) -> Option<Self> {
@@ -18,6 +19,7 @@ impl Platform {
             "MFC" => Some(Self::MFC),
             "SC" => Some(Self::SC),
             "SCVR" => Some(Self::SCVR),
+            "BONGA" => Some(Self::BONGA),
             _ => None,
         }
     }
@@ -27,6 +29,7 @@ impl Platform {
             Self::MFC => mfc::parse_playlist,
             Self::SC => sc::parse_playlist,
             Self::SCVR => scvr::parse_playlist,
+            Self::BONGA => bonga::parse_playlist,
         }
     }
     fn get_playlist(&self) -> fn(&str) -> Result<Option<String>> {
@@ -35,6 +38,7 @@ impl Platform {
             Self::MFC => mfc::get_playlist,
             Self::SC => sc::get_playlist,
             Self::SCVR => scvr::get_playlist,
+            Self::BONGA => bonga::get_playlist,
         }
     }
     pub fn referer(&self) -> &'static str {
@@ -43,6 +47,7 @@ impl Platform {
             Self::MFC => "https://www.myfreecams.com/",
             Self::SC => "https://stripchat.com/",
             Self::SCVR => "https://vr.stripchat.com/",
+            Self::BONGA => "https://bongacams.com/",
         }
     }
 }

@@ -104,7 +104,8 @@ fn parse_json(filepath: &str) -> Result<serde_json::Value> {
                     "CB": [],
                     "MFC": [],
                     "SCVR": [],
-                    "SC": []
+                    "SC": [],
+                    "BONGA": [],
                 },
                 "config": {
                     "user-agent": ""
