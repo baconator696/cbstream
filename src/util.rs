@@ -48,7 +48,7 @@ pub fn get_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String>
             resp.text().map_err(e!())?
         };
         if resp_code != 200 {
-            return Err(format!("{}", resp_code))?;
+            return Err(format!("{}|{}", resp_text, resp_code))?;
         }
         Ok(resp_text)
     };
@@ -105,10 +105,11 @@ pub fn post_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String
             for (k, v) in headers {
                 h.insert(HeaderName::from_str(&k).map_err(e!())?, HeaderValue::from_str(&v).map_err(e!())?);
             }
-            client.get(url).headers(h)
+            client.post(url).headers(h)
         } else {
-            client.get(url)
+            client.post(url)
         };
+
         let resp = build
             .body(payload.to_string())
             .header("content-type", content_type)
@@ -129,7 +130,7 @@ pub fn post_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String
             resp.text().map_err(e!())?
         };
         if resp_code != 200 {
-            return Err(format!("{}", resp_code))?;
+            return Err(format!("{}|{}", resp_text, resp_code))?;
         }
         Ok(resp_text)
     };
@@ -150,6 +151,7 @@ pub fn create_headers(json_map: serde_json::Value) -> Result<HashMap<String, Str
     }
     Ok(headers)
 }
+
 // returns string in between two strings and returns last index where found
 pub fn _find<'a>(search: &'a str, start: &str, end: &str, i: usize) -> Option<(&'a str, usize)> {
     let start_loc = search.get(i..)?.find(start)? + i + start.len();
