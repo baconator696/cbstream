@@ -22,6 +22,12 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
         Some(o) => o,
         None => return Ok(None),
     };
+    if !json["performerData"]["isOnline"].as_bool().ok_or_else(o!())? {
+        return Ok(None);
+    }
+    if json["performerData"]["isAway"].as_bool().ok_or_else(o!())? {
+        return Ok(None);
+    }
     let playlist_url = format!(
         "https:{}/hls/stream_{}/playlist.m3u8",
         hls,
