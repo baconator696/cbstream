@@ -69,7 +69,16 @@ docker run --name cbstream -v <save location>:/cbstream --stop-timeout 300 -itd 
 - Add support for more streaming platforms
 - Improve request handling to mimic real user behavior
 - Implement the ability to download private shows
+- Build for MacOS, but I don't have a mac to test on
 
+---
+I will not create binaries for Linux because the Linux binary relies on shared libraries, you'll have to compile it yourself
+
+Rust and Git need to be installed:
+```bash
+git clone https://github.com/baconator696/cbstream.git
+cargo build -r
+```
 ---
 
 This project is actively being developed. Contributions and feedback are welcome!
