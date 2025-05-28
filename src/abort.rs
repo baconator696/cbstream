@@ -1,14 +1,10 @@
-use crate::{o, s};
+use crate::s;
 use std::sync::{Arc, OnceLock, RwLock, atomic};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 static ABORT: OnceLock<Arc<RwLock<bool>>> = OnceLock::new();
 pub fn get() -> Result<bool> {
-    let a = if ABORT.get().is_none() {
-        ABORT.get_or_init(|| init_internal().unwrap())
-    } else {
-        ABORT.get().ok_or_else(o!())?
-    };
+    let a = ABORT.get_or_init(|| init_internal().unwrap());
     return Ok(*a.read().map_err(s!())?);
 }
 fn init_internal() -> Result<Arc<RwLock<bool>>> {
