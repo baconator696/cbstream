@@ -21,4 +21,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            cbstream.exe
+            cbstream-win-amd64.exe
