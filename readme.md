@@ -1,7 +1,7 @@
 
 # cbstream - Work in Progress
 
-This is a work in progress tool for downloading streams from supported platforms. It currently supports **CB**, **SC**, and **MFC**. For MKV output, ensure **ffmpeg** or **mkvtoolnix** is installed.
+This is a work in progress tool for downloading streams from supported platforms. It currently supports **CB**, **SC**, **BONGA**, and **MFC**. For MKV output, ensure **ffmpeg** or **mkvtoolnix** is installed.
 
 ---
 
@@ -30,15 +30,19 @@ The configuration file follows this structure:
 ```json
 {
   "platform": {
-    "CB": ["model1"],
-    "MFC": ["model2", "model3"],
-    "SC": [],
-    "SCVR": []
+      "CB": [],
+      "MFC": [],
+      "SCVR": [],
+      "SC": [],
+      "BONGA": [],
+  },
+  "config": {
+      "user-agent": ""
   }
 }
 ```
 
-- **CB**, **SC**, **MFC**, **SCVR**: Supported platforms. Add model names to the respective lists.
+- **CB**, **SC**, **MFC**, **SCVR**, **BONGA**: Supported platforms. Add model names to the respective lists.
 
 ---
 
