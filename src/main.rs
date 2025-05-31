@@ -2,7 +2,6 @@ mod abort;
 mod config;
 mod err;
 mod muxer;
-mod platform;
 mod platforms;
 mod stream;
 mod util;

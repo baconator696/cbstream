@@ -1,4 +1,4 @@
-use crate::platform::Platform;
+use crate::platforms::Platform;
 use crate::stream::Stream;
 use crate::util;
 use crate::{e, h, o, s};

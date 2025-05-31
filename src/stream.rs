@@ -1,11 +1,11 @@
-use crate::{abort, muxer, platform, util};
+use crate::{abort, muxer, platforms::Platform, util};
 use crate::{e, s};
 use std::io::{Seek, Write};
 use std::sync::{Arc, RwLock};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 pub struct Playlist {
-    pub platform: platform::Platform,
+    pub platform: Platform,
     pub username: String,
     playlist_url: String,
     pub playlist: Option<String>,
@@ -16,7 +16,7 @@ pub struct Playlist {
 }
 impl Playlist {
     pub fn new(
-        platform: platform::Platform,
+        platform: Platform,
         username: String,
         playlist_url: String,
         abort: Arc<RwLock<bool>>,
@@ -124,10 +124,10 @@ pub struct Stream {
     pub file: Option<fs::File>,
     pub last: Option<Arc<RwLock<Stream>>>,
     file_header: Option<Arc<Vec<u8>>>,
-    platform: platform::Platform,
+    platform: Platform,
 }
 impl Stream {
-    pub fn new(filename: &str, url: &str, id: u32, filepath: &str, file_header: Option<Arc<Vec<u8>>>, platform: platform::Platform) -> Self {
+    pub fn new(filename: &str, url: &str, id: u32, filepath: &str, file_header: Option<Arc<Vec<u8>>>, platform: Platform) -> Self {
         Self {
             filename: filename.to_string(),
             url: url.to_string(),

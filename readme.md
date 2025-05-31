@@ -1,17 +1,17 @@
 
-# cbstream - Work in Progress
+## cbstream - Work in Progress
 
 This is a work in progress tool for downloading streams from supported platforms. It currently supports **CB**, **SC**, **BONGA**, and **MFC**. For MKV output, ensure **ffmpeg** or **mkvtoolnix** is installed.
 
 ---
 
-## Installation
+### Installation
 
 Before using the program, install **ffmpeg** or **mkvtoolnix** if you plan to output in MKV format. No other dependencies are required for basic functionality.
 
 ---
 
-## Usage
+### Usage
 
 This is a command line program, to run the program using terminal in Windows:
 
@@ -23,15 +23,15 @@ After execution, a JSON configuration file will be saved in the working director
 
 ---
 
-## JSON Configuration
+### JSON Configuration
 
 The configuration file follows this structure:
 
 ```json
 {
   "platform": {
-      "CB": [],
-      "MFC": [],
+      "CB": ["model1","model2"],
+      "MFC": ["model3"],
       "SCVR": [],
       "SC": [],
       "BONGA": [],
@@ -46,13 +46,13 @@ The configuration file follows this structure:
 
 ---
 
-## Environment Variables
+### Environment Variables
 
 An optional environment variable `TEMP` can be set to specify where temporary streams are saved. If not set, temporary files will be stored in the OS's default temp folder.
 
 ---
 
-## Docker Usage
+### Docker Usage
 
 To run the program using Docker, use the following command:
 
@@ -68,9 +68,8 @@ docker run --name cbstream -v <save location>:/cbstream --stop-timeout 300 -itd 
 
 ---
 
-## TODO
+### To do
 - Add support for more streaming platforms
-- Improve request handling to mimic real user behavior
 - Implement the ability to download private shows
 - Build for MacOS, but I don't have a mac to test on
 

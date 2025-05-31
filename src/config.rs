@@ -1,4 +1,4 @@
-use crate::platform::{Model, Platform};
+use crate::platforms::{Model, Platform};
 use crate::{e, s, util};
 use std::collections::{HashMap, HashSet};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
@@ -74,8 +74,10 @@ pub fn load(json_path: &str) -> Result<Models> {
                 if let Some(usernames) = usernames.as_array() {
                     for username in usernames {
                         if let Some(username) = username.as_str() {
-                            let model = Model::new(p.clone(), username);
-                            models.add(model.composite_key(), model).map_err(s!())?;
+                            if username.len() > 0 {
+                                let model = Model::new(p.clone(), username);
+                                models.add(model.composite_key(), model).map_err(s!())?;
+                            }
                         }
                     }
                 }
