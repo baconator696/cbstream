@@ -69,6 +69,7 @@ docker run --name cbstream -v <save location>:/cbstream --stop-timeout 300 -itd 
 ---
 
 ### To do
+- select maximum resolution
 - Add support for more streaming platforms
 - Implement the ability to download private shows
 - Build for MacOS, but I don't have a mac to test on
