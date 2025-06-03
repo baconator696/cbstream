@@ -196,14 +196,8 @@ pub fn create_dir(dir: &str) -> Result<()> {
 }
 // returns url prefix
 pub fn url_prefix(url: &str) -> Option<&str> {
-    let mut n = 0;
-    loop {
-        n = match str::find(url.get(n + 1..)?, "/") {
-            Some(m) => m + n + 1,
-            None => break,
-        };
-    }
-    url.get(..n)
+    let n = url.rfind("/")?;
+    url.get(..n+1)
 }
 pub fn remove_non_num(url: &str) -> String {
     url.chars().filter(|c| c.is_ascii_digit()).collect::<String>()
