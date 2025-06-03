@@ -257,11 +257,16 @@ fn local_muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, pf: Platform)
     let mut file = fs::OpenOptions::new().create(true).append(true).open(filepath).map_err(e!())?;
     // muxes stream to file
     for stream in streams {
+        let mut buffer = vec![0u8; 1 << 16];
         let s = &mut (*stream.write().map_err(s!())?);
         if let Some(mut f) = s.file.take() {
-            let mut data: Vec<u8> = Vec::new();
-            _ = f.read_to_end(&mut data).map_err(e!())?;
-            file.write_all(&data).map_err(e!())?;
+            loop {
+                let n  = f.read(&mut buffer).map_err(e!())?;
+                if n == 0 {
+                    break
+                }
+                file.write_all(&buffer[..n]).map_err(e!())?;
+            }
             fs::remove_file(&s.filepath).map_err(e!())?;
         }
     }
