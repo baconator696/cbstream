@@ -4,9 +4,11 @@ use crate::{stream, util};
 use std::sync::Arc;
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
+#[inline]
 pub fn get_playlist(username: &str) -> Result<Option<String>> {
     sc_get_playlist(username, false)
 }
+#[inline]
 pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Stream>> {
     sc_parse_playlist(playlist, false)
 }
@@ -92,7 +94,7 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
         // parse stream id
         let id = line.split("_").last().ok_or_else(o!())?;
         let n = id.find(".").ok_or_else(o!())?;
-        let id = (&id[..n]).trim().parse::<u32>().map_err(e!())?;
+        let id = id[..n].trim().parse::<u32>().map_err(e!())?;
         // parse filename
         let vr_str = if vr { "SCVR" } else { "SC" };
         let date = date.as_ref().ok_or_else(o!())?;
