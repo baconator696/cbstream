@@ -1,3 +1,7 @@
+[target.default]
+rustflags = [
+  "-C", "target-feature=+crt-static"
+]
 [target.x86_64-pc-windows-gnu]
 linker = "x86_64-w64-mingw32-gcc"
 rustflags = [
@@ -8,7 +12,13 @@ linker = "aarch64-linux-gnu-gcc"
 rustflags = [
   "-C", "target-feature=+crt-static"
 ]
-[target.default]
+[target.aarch64-apple-darwin]
+linker = "oa64-clang"
+rustflags = [
+  "-C", "target-feature=+crt-static"
+]
+[target.x86_64-apple-darwin]
+linker = "o64h-clang"
 rustflags = [
   "-C", "target-feature=+crt-static"
 ]

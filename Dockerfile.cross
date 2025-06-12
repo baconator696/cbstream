@@ -1,0 +1,6 @@
+FROM --platform=$BUILDPLATFORM crazymax/osxcross AS osxcross
+FROM rust
+ENV PATH="/osxcross/bin:$PATH"
+ENV LD_LIBRARY_PATH="/osxcross/lib:$LD_LIBRARY_PATH"
+COPY --from=osxcross /osxcross /osxcross
+CMD ["bash"]
