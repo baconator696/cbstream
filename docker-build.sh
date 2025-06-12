@@ -36,12 +36,12 @@ if [ "$1" = "linux/arm64" ]; then
         apt install -y gcc gcc-aarch64-linux-gnu pkg-config ffmpeg:arm64 &&
         rustup target add aarch64-unknown-linux-gnu &&
         CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
-        cargo build -r --target aarch64-unknown-linux-gnu
+            cargo build -r --target aarch64-unknown-linux-gnu
 elif [ "$1" = "linux/amd64" ]; then
     apt update &&
         apt install -y gcc pkg-config ffmpeg &&
         CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=gcc \
-        cargo build -r --target x86_64-unknown-linux-gnu
+            cargo build -r --target x86_64-unknown-linux-gnu
 else
     echo "Unsupported platform: $1"
     exit 1
@@ -57,7 +57,7 @@ fi &&
             cp -r --parents /usr/lib/aarch64-linux-gnu/pulseaudio /target/root/ &&
             copy_lib_star /usr/lib/aarch64-linux-gnu/pulseaudio /target/root/ aarch64-linux-gnu-gcc
     elif [ "$1" = "linux/amd64" ]; then
-        mv /build/target/release/cbstream-rust /target/root/bin/cbstream &&
+        mv /build/target/x86_64-unknown-linux-gnu/release/cbstream-rust /target/root/bin/cbstream &&
             ln -s /usr/lib/x86_64-linux-gnu /target/root/lib &&
             ln -s /usr/lib/x86_64-linux-gnu /target/root/lib64 &&
             copy_lib /target/root/bin/ffmpeg /target/root/ gcc &&
