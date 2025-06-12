@@ -23,3 +23,5 @@ jobs:
         with:
           files: |
             cbstream-win-amd64.exe
+            cbstream-linux-amd64
+            cbstream-linux-arm64

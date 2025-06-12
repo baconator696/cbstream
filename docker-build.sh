@@ -32,17 +32,12 @@ fi
 if [ "$1" = "linux/arm64" ]; then
     dpkg --add-architecture arm64 &&
         apt update &&
-        apt install -y rustup gcc gcc-aarch64-linux-gnu libssl-dev:arm64 pkg-config ffmpeg:arm64 &&
-        cp -rs /usr/lib/aarch64-linux-gnu/* /usr/aarch64-linux-gnu/lib
-    rustup default stable &&
+        apt install -y gcc gcc-aarch64-linux-gnu pkg-config ffmpeg:arm64 &&
         rustup target add aarch64-unknown-linux-gnu &&
-        OPENSSL_DIR=/usr/aarch64-linux-gnu \
-            CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER="aarch64-linux-gnu-gcc" \
-            cargo build -r --target aarch64-unknown-linux-gnu
+        cargo build -r --target aarch64-unknown-linux-gnu
 elif [ "$1" = "linux/amd64" ]; then
     apt update &&
-        apt install -y rustup gcc libssl-dev pkg-config ffmpeg &&
-        rustup default stable &&
+        apt install -y gcc pkg-config ffmpeg &&
         cargo build -r
 else
     echo "Unsupported platform: $1"
@@ -55,7 +50,6 @@ fi &&
         mv /build/target/aarch64-unknown-linux-gnu/release/cbstream-rust /target/root/bin/cbstream &&
             ln -s /usr/aarch64-linux-gnu/lib /target/root/lib &&
             ln -s /usr/aarch64-linux-gnu/lib /target/root/lib64 &&
-            copy_lib /target/root/bin/cbstream /target/root/ aarch64-linux-gnu-gcc &&
             copy_lib /target/root/bin/ffmpeg /target/root/ aarch64-linux-gnu-gcc &&
             cp -r --parents /usr/lib/aarch64-linux-gnu/pulseaudio /target/root/ &&
             copy_lib_star /usr/lib/aarch64-linux-gnu/pulseaudio /target/root/ aarch64-linux-gnu-gcc
@@ -63,7 +57,6 @@ fi &&
         mv /build/target/release/cbstream-rust /target/root/bin/cbstream &&
             ln -s /usr/lib/x86_64-linux-gnu /target/root/lib &&
             ln -s /usr/lib/x86_64-linux-gnu /target/root/lib64 &&
-            copy_lib /target/root/bin/cbstream /target/root/ gcc &&
             copy_lib /target/root/bin/ffmpeg /target/root/ gcc &&
             cp -r --parents /usr/lib/x86_64-linux-gnu/pulseaudio /target/root/ &&
             copy_lib_star /usr/lib/x86_64-linux-gnu/pulseaudio /target/root/ gcc
