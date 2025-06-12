@@ -48,7 +48,7 @@ pub fn get_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String>
             resp.text().map_err(e!())?
         };
         if resp_code != 200 {
-            return Err(format!("{}|{}", resp_text, resp_code))?;
+            return Err(format!("{}",resp_code))?;
         }
         Ok(resp_text)
     };
@@ -80,7 +80,7 @@ pub fn get_retry_vec(url: &str, retry: i32, headers: Option<&HashMap<String, Str
         let resp = build.send().map_err(e!())?;
         let resp_code = resp.status();
         if resp_code != 200 {
-            return Err(format!("{}|{}", resp.text().map_err(e!())?.trim(), resp_code))?;
+            return Err(format!("{}", resp_code))?;
         }
         Ok(resp.bytes().map_err(e!())?.to_vec())
     };
@@ -130,7 +130,7 @@ pub fn post_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String
             resp.text().map_err(e!())?
         };
         if resp_code != 200 {
-            return Err(format!("{}|{}", resp_text, resp_code))?;
+            return Err(format!("{}", resp_code))?;
         }
         Ok(resp_text)
     };
