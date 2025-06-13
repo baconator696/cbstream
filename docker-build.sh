@@ -10,7 +10,7 @@ copy_lib() {
             local path=$("$gcc" -print-file-name="$lib" 2>/dev/null)
             [[ -n "$path" ]] || continue
             echo COPYING "$path" to "$target"
-            cp --parents "$path" "$target"
+            cp -L "$path" "$target"
             copy_lib "$path" "$target" "$gcc"
         fi
     done < <(readelf -d "$lib" | awk '/NEEDED/ { print $5 }' | tr -d '[]')
@@ -48,19 +48,18 @@ else
 fi &&
     # Copies all needed binaries/libraries for export
     mkdir -p /target/root/bin &&
-    mv /bin/ffmpeg /target/root/bin/ffmpeg &&
+    mkdir -p /target/root/usr/local/lib/ &&
+    ln -s /usr/local/lib /target/root/lib &&
+    ln -s /usr/local/lib /target/root/lib64 &&
+    cp /bin/ffmpeg /target/root/bin/ffmpeg &&
     if [ "$1" = "linux/arm64" ]; then
         mv /build/target/aarch64-unknown-linux-gnu/release/cbstream-rust /target/root/bin/cbstream &&
-            ln -s /usr/aarch64-linux-gnu/lib /target/root/lib &&
-            ln -s /usr/aarch64-linux-gnu/lib /target/root/lib64 &&
-            copy_lib /target/root/bin/ffmpeg /target/root/ aarch64-linux-gnu-gcc &&
-            cp -r --parents /usr/lib/aarch64-linux-gnu/pulseaudio /target/root/ &&
-            copy_lib_star /usr/lib/aarch64-linux-gnu/pulseaudio /target/root/ aarch64-linux-gnu-gcc
+            copy_lib /bin/ffmpeg /target/root/usr/local/lib/ aarch64-linux-gnu-gcc &&
+            cp -L /usr/lib/aarch64-linux-gnu/pulseaudio/libpulsecommon* /target/root/usr/local/lib/ &&
+            copy_lib_star /usr/lib/aarch64-linux-gnu/pulseaudio/libpulsecommon* /target/root/usr/local/lib/ aarch64-linux-gnu-gcc
     elif [ "$1" = "linux/amd64" ]; then
         mv /build/target/x86_64-unknown-linux-gnu/release/cbstream-rust /target/root/bin/cbstream &&
-            ln -s /usr/lib/x86_64-linux-gnu /target/root/lib &&
-            ln -s /usr/lib/x86_64-linux-gnu /target/root/lib64 &&
-            copy_lib /target/root/bin/ffmpeg /target/root/ gcc &&
-            cp -r --parents /usr/lib/x86_64-linux-gnu/pulseaudio /target/root/ &&
-            copy_lib_star /usr/lib/x86_64-linux-gnu/pulseaudio /target/root/ gcc
+            copy_lib /bin/ffmpeg /target/root/usr/local/lib/ gcc &&
+            cp -L /usr/lib/x86_64-linux-gnu/pulseaudio/libpulsecommon* /target/root/usr/local/lib/ &&
+            copy_lib_star /usr/lib/x86_64-linux-gnu/pulseaudio/libpulsecommon* /target/root/usr/local/lib/ gcc
     fi
