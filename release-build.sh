@@ -1,8 +1,8 @@
-docker build -t rustcross -f Dockerfile.cross . &&
-    docker run --rm -it \
-        -v $(pwd):/mnt -w /mnt \
-        -e TAG="$TAG" \
-        rustcross bash -c "
+docker build -t rustcross -f Dockerfile.cross .
+docker run --rm -it \
+    -v $(pwd):/mnt -w /mnt \
+    -e TAG="$TAG" \
+    rustcross bash -c "
 apt update &&
     apt install -y clang gcc gcc-mingw-w64 gcc-aarch64-linux-gnu pkg-config &&
     rustup target add x86_64-pc-windows-gnu aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin &&
