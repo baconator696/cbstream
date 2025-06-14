@@ -1,5 +1,5 @@
-docker build -t rustcross -f Dockerfile.cross .
-docker run --rm -it \
+docker build -t rustcross -f Dockerfile.cross . &&
+docker run --rm \
     -v $(pwd):/mnt -w /mnt \
     -e TAG="$TAG" \
     rustcross bash -c "
