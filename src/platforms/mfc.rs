@@ -26,9 +26,12 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
     if sessions.len() == 0 {
         return Ok(None);
     }
+    let server_name = sessions[0]["server_name"].as_str().ok_or_else(o!())?;
+    if server_name.len() == 0 {
+        return Ok(None);
+    }
     let phase = sessions[0]["phase"].as_str().ok_or_else(o!())?;
     let playform_id = sessions[0]["platform_id"].as_i64().ok_or_else(o!())?;
-    let server_name = sessions[0]["server_name"].as_str().ok_or_else(o!())?;
     let server_name = util::remove_non_num(server_name);
     let playlist_url = format!(
         "https://edgevideo.myfreecams.com/llhls/NxServer/{}/ngrp:mfc_{}{}{}.f4v_cmaf/playlist_sfm4s.m3u8",
