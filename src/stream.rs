@@ -90,11 +90,12 @@ impl Playlist {
         }
     }
     fn mux_streams(&mut self) -> Result<()> {
-        let mut streams: Vec<sync::Arc<sync::RwLock<Stream>>> = Vec::new();
         let mut last = match self.last_stream.take() {
             Some(o) => o,
             None => return Ok(()),
         };
+        let size = last.read().map_err(s!())?.index as usize;
+        let mut streams = Vec::with_capacity(size);
         // adds all streams to an iterator
         loop {
             streams.push(last.clone());
@@ -120,6 +121,7 @@ pub struct Stream {
     pub filename: String,
     url: String,
     id: u32,
+    index: u32,
     pub filepath: String,
     pub file: Option<fs::File>,
     pub last: Option<Arc<RwLock<Stream>>>,
@@ -132,6 +134,7 @@ impl Stream {
             filename: filename.to_string(),
             url: url.to_string(),
             id,
+            index: 0,
             filepath: filepath.to_string(),
             file: None,
             last: None,
@@ -142,6 +145,10 @@ impl Stream {
     /// downloads the stream given the Stream's url
     pub fn download(&mut self, last: Option<Arc<RwLock<Stream>>>) -> Result<()> {
         println!("{}_{}", self.filename, self.id);
+        self.index = match last.as_ref() {
+            Some(o) => o.read().map_err(s!())?.index,
+            None => 1,
+        };
         self.last = last;
         let headers = util::create_headers(serde_json::json!({
             "user-agent": util::get_useragent().map_err(s!())?,
