@@ -1,10 +1,12 @@
 use crate::{e, o, s};
-use std::sync::{Arc, OnceLock, RwLock};
-use std::{collections::HashMap, io::Read, *};
-
+use std::{
+    collections::HashMap,
+    io::Read,
+    path::{Path, PathBuf},
+    sync::{Arc, OnceLock, RwLock},
+    *,
+};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
-
-pub const SLASH: &str = if cfg!(target_os = "windows") { "\\" } else { "/" };
 
 static USERAGENT: OnceLock<Arc<RwLock<String>>> = OnceLock::new();
 pub fn set_useragent(useragent: String) -> Result<()> {
@@ -48,7 +50,7 @@ pub fn get_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String>
             resp.text().map_err(e!())?
         };
         if resp_code != 200 {
-            return Err(format!("{}",resp_code))?;
+            return Err(format!("{}", resp_code))?;
         }
         Ok(resp_text)
     };
@@ -151,36 +153,29 @@ pub fn create_headers(json_map: serde_json::Value) -> Result<HashMap<String, Str
     }
     Ok(headers)
 }
-
-// returns string in between two strings and returns last index where found
-pub fn _find<'a>(search: &'a str, start: &str, end: &str, i: usize) -> Option<(&'a str, usize)> {
-    let start_loc = search.get(i..)?.find(start)? + i + start.len();
-    let end_loc = search.get(start_loc..)?.find(end)? + start_loc;
-    let find = search.get(start_loc..end_loc)?;
-    let offset = end_loc + end.len();
-    Some((find, offset))
-}
 /// returns current date and time in "24-02-29_23-12" format
 pub fn date() -> String {
     let now = chrono::Local::now();
     now.format("%y-%m-%d_%H-%M").to_string()
 }
 /// returns temp directory location ex. "/tmp/cbstream/""
-pub fn temp_dir() -> Result<String> {
-    let temp_dir = if cfg!(target_os = "windows") {
+pub fn temp_dir() -> Result<PathBuf> {
+    let mut temp_dir = PathBuf::new();
+    if cfg!(target_os = "windows") {
         let t = env::var("TEMP").map_err(e!())?;
-        format!("{}\\cbstream\\", t)
+        temp_dir.push(t);
     } else {
         let t = match env::var("TEMP") {
             Ok(r) => r,
             _ => format!("/tmp"),
         };
-        format!("{}/cbstream/", t)
+        temp_dir.push(t);
     };
+    temp_dir.push("cbstream");
     Ok(temp_dir)
 }
 // creates temp directory
-pub fn create_dir(dir: &str) -> Result<()> {
+pub fn create_dir(dir: &Path) -> Result<()> {
     match fs::create_dir_all(dir) {
         Err(e) => {
             if e.kind() == io::ErrorKind::AlreadyExists {

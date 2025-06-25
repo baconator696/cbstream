@@ -1,7 +1,4 @@
-use crate::platforms::Platform;
-use crate::{e, o, s};
-use crate::{stream, util};
-use std::sync::Arc;
+use crate::{e, o, platforms::Platform, s, stream, util};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 #[inline]
@@ -73,7 +70,7 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
                 }))
                 .map_err(s!())?;
                 let header = util::get_retry_vec(header_url, 5, Some(&http_headers)).map_err(s!())?;
-                playlist.mp4_header = Some(Arc::new(header))
+                playlist.mp4_header = Some(sync::Arc::new(header))
             }
         }
         // parse date and time from playlist
@@ -99,7 +96,8 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
         let vr_str = if vr { "SCVR" } else { "SC" };
         let date = date.as_ref().ok_or_else(o!())?;
         let filename = format!("{}_{}_{}", vr_str, playlist.username, date);
-        let filepath = format!("{}{}-{}-{}-{}.mp4", temp_dir, vr_str.to_lowercase(), playlist.username, date, id);
+        let mut filepath = path::PathBuf::from(&temp_dir);
+        filepath.push(format!("{}-{}-{}-{}.mp4", vr_str.to_lowercase(), playlist.username, date, id));
         streams.push(stream::Stream::new(
             &filename,
             &url,

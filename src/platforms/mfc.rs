@@ -1,6 +1,4 @@
-use crate::platforms::Platform;
-use crate::{e, o, s};
-use crate::{stream, util};
+use crate::{e, o, platforms::Platform, s, stream, util};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 pub fn get_playlist(username: &str) -> Result<Option<String>> {
@@ -64,7 +62,8 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
         //parse filenames
         let date = util::date();
         let filename = format!("MFC_{}_{}", playlist.username, date);
-        let filepath = format!("{}mfc-{}-{}-{}.ts", temp_dir, playlist.username, date, id);
+        let mut filepath = path::PathBuf::from(&temp_dir);
+        filepath.push(format!("mfc-{}-{}-{}.ts", playlist.username, date, id));
         streams.push(stream::Stream::new(&filename, &url, id, &filepath, None, Platform::MFC));
     }
     Ok(streams)

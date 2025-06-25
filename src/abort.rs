@@ -1,6 +1,8 @@
 use crate::s;
-use std::sync::{Arc, OnceLock, RwLock, atomic};
-use std::*;
+use std::{
+    sync::{Arc, OnceLock, RwLock, atomic},
+    *,
+};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 static ABORT: OnceLock<Arc<RwLock<bool>>> = OnceLock::new();
 pub fn get() -> Result<bool> {

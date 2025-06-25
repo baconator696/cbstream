@@ -1,8 +1,13 @@
-use crate::platforms::{Model, Platform};
-use crate::{e, s, util};
-use std::collections::{HashMap, HashSet};
+use crate::{
+    e,
+    platforms::{Model, Platform},
+    s, util,
+};
+use std::{
+    collections::{HashMap, HashSet},
+    *,
+};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
-use std::*;
 pub struct Models {
     config_filepath: String,
     models: HashMap<String, Model>,

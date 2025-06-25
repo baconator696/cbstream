@@ -4,10 +4,15 @@ pub mod mfc;
 pub mod sc;
 pub mod scvr;
 
-use crate::stream::{Playlist, Stream};
-use crate::{h, o, s};
-use std::sync::{Arc, RwLock};
-use std::{thread::JoinHandle, *};
+use crate::{
+    h, o, s,
+    stream::{Playlist, Stream},
+};
+use std::{
+    sync::{Arc, RwLock},
+    thread::JoinHandle,
+    *,
+};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 #[derive(Debug, Clone)]
 pub enum Platform {

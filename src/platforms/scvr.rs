@@ -1,5 +1,7 @@
-use crate::platforms::sc;
-use crate::stream::{Playlist, Stream};
+use crate::{
+    platforms::sc,
+    stream::{Playlist, Stream},
+};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 #[inline]

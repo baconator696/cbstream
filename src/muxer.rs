@@ -1,20 +1,20 @@
-use crate::platforms::Platform;
-use crate::stream::Stream;
-use crate::util;
-use crate::{e, h, o, s};
-use std::io::{Read, Write};
-use std::process::ExitStatus;
-use std::sync::{Arc, RwLock};
-use std::*;
+use crate::{e, h, o, platforms::Platform, s, stream::Stream, util};
+use std::{
+    io::{Read, Write},
+    path::{Path, PathBuf},
+    process::ExitStatus,
+    sync::{Arc, RwLock},
+    *,
+};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 type Hresult<T> = result::Result<T, String>;
 /// file management
-pub struct FileManage(String);
+pub struct FileManage(PathBuf);
 impl FileManage {
-    pub fn new(filepath: String) -> Result<Self> {
+    pub fn new(filepath: PathBuf) -> Result<Self> {
         Ok(Self(filepath))
     }
-    pub fn filepath(&self) -> &str {
+    pub fn filepath(&self) -> &Path {
         &self.0
     }
 }
@@ -72,27 +72,30 @@ fn ffmpeg_exists() -> Result<Option<&'static str>> {
     }
 }
 /// muxes streams with mkvmerge
-fn mkvmerge(mkvmerge_path: &str, streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, filename: &str) -> Result<()> {
-    let filepath = format!("{}.mkv", filepath);
+fn mkvmerge(mkvmerge_path: &str, streams: &Vec<Arc<RwLock<Stream>>>, filepath: &Path) -> Result<()> {
+    let mut filepath = filepath.to_path_buf();
+    filepath.set_extension("mkv");
     // creates arg list for mkvmerge
     let mut arg_list: Vec<String> = Vec::with_capacity(streams.len() * 2 + 2);
     arg_list.push("-o".into());
-    arg_list.push(filepath.clone());
+    arg_list.push(filepath.display().to_string());
     for stream in streams {
         let s = &(*stream.read().map_err(s!())?);
         if s.file.is_some() {
-            arg_list.push(s.filepath.clone());
+            arg_list.push(format!("{}", s.stream_path.display()));
             arg_list.push("+".into());
         }
     }
     arg_list.pop();
     let json = serde_json::to_string(&arg_list).map_err(e!())?;
-    let json_filepath = format!("{}{}.json", util::temp_dir().map_err(s!())?, filename);
-    fs::write(&json_filepath, json).map_err(e!())?;
-    let json_file = FileManage::new(json_filepath).map_err(s!())?;
+    let mut json_path = util::temp_dir().map_err(s!())?;
+    json_path.push(filepath.file_name().ok_or_else(o!())?);
+    json_path.set_extension("json");
+    fs::write(&json_path, json).map_err(e!())?;
+    let json_file = FileManage::new(json_path).map_err(s!())?;
     // starts mkvmerge process
     let mut child = process::Command::new(mkvmerge_path)
-        .arg(format!("@{}", json_file.filepath()))
+        .arg(format!("@{}", json_file.filepath().display()))
         .arg("-q")
         .stderr(process::Stdio::piped())
         .stdout(process::Stdio::piped())
@@ -137,8 +140,9 @@ fn mkvmerge(mkvmerge_path: &str, streams: &Vec<Arc<RwLock<Stream>>>, filepath: &
     return Ok(());
 }
 /// muxes streams with ffmpeg pipe
-fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, pf: &Platform) -> Result<()> {
-    let filepath = format!("{}.mkv", filepath);
+fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<Stream>>>, filepath: &Path, pf: &Platform) -> Result<()> {
+    let mut filepath = filepath.to_path_buf();
+    filepath.push("mkv");
     let container_type = match pf {
         Platform::CB => "mpegts",
         Platform::MFC => "mpegts",
@@ -227,7 +231,7 @@ fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str,
     return Ok(());
 }
 /// Main Muxing Function
-pub fn muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, filename: &str, pf: Platform) -> Result<()> {
+pub fn muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &Path, pf: Platform) -> Result<()> {
     if let Some(ffmpeg_path) = ffmpeg_exists().map_err(s!())? {
         match ffmpeg(ffmpeg_path, streams, filepath, &pf) {
             Err(e) => eprintln!("{}", e),
@@ -235,7 +239,7 @@ pub fn muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, filename: &str,
         }
     }
     if let Some(mkvmerge_path) = mkv_exists().map_err(s!())? {
-        match mkvmerge(&mkvmerge_path, streams, filepath, filename) {
+        match mkvmerge(&mkvmerge_path, streams, filepath) {
             Err(e) => eprintln!("{}", e),
             Ok(_) => return Ok(()),
         }
@@ -244,7 +248,7 @@ pub fn muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, filename: &str,
     Ok(())
 }
 /// Fallback local muxer
-fn local_muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, pf: Platform) -> Result<()> {
+fn local_muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &Path, pf: Platform) -> Result<()> {
     let extension = match pf {
         Platform::CB => "ts",
         Platform::MFC => "ts",
@@ -252,7 +256,8 @@ fn local_muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, pf: Platform)
         Platform::SCVR => "mp4",
         Platform::BONGA => "ts",
     };
-    let filepath = format!("{}.{}", filepath, extension);
+    let mut filepath = filepath.to_path_buf();
+    filepath.set_extension(extension);
     // creates file
     let mut file = fs::OpenOptions::new().create(true).append(true).open(filepath).map_err(e!())?;
     // muxes stream to file
@@ -261,13 +266,13 @@ fn local_muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &str, pf: Platform)
         let s = &mut (*stream.write().map_err(s!())?);
         if let Some(mut f) = s.file.take() {
             loop {
-                let n  = f.read(&mut buffer).map_err(e!())?;
+                let n = f.read(&mut buffer).map_err(e!())?;
                 if n == 0 {
-                    break
+                    break;
                 }
                 file.write_all(&buffer[..n]).map_err(e!())?;
             }
-            fs::remove_file(&s.filepath).map_err(e!())?;
+            fs::remove_file(&s.stream_path).map_err(e!())?;
         }
     }
     Ok(())

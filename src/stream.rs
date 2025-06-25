@@ -1,8 +1,10 @@
-use crate::{abort, muxer, platforms::Platform, util};
-use crate::{e, s};
-use std::io::{Seek, Write};
-use std::sync::{Arc, RwLock};
-use std::*;
+use crate::{abort, e, muxer, platforms::Platform, s, util};
+use std::{
+    io::{Seek, Write},
+    path::{Path,PathBuf},
+    sync::{Arc, RwLock},
+    *,
+};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 pub struct Playlist {
     pub platform: Platform,
@@ -109,11 +111,12 @@ impl Playlist {
             return Ok(());
         }
         streams.reverse();
-        util::create_dir(&self.username).map_err(s!())?;
+        util::create_dir(Path::new(&self.username)).map_err(s!())?;
         // creates filename
         let filename = streams[0].read().map_err(s!())?.filename.clone();
-        let filepath = format!("{}{}{}", &self.username, util::SLASH, filename);
-        muxer::muxer(&streams, &filepath, &filename, self.platform.clone())?;
+        let mut filepath = PathBuf::from(&self.username);
+        filepath.push(&filename);
+        muxer::muxer(&streams, &filepath, self.platform.clone())?;
         Ok(())
     }
 }
@@ -122,20 +125,20 @@ pub struct Stream {
     url: String,
     id: u32,
     index: u32,
-    pub filepath: String,
+    pub stream_path: path::PathBuf,
     pub file: Option<fs::File>,
     pub last: Option<Arc<RwLock<Stream>>>,
     file_header: Option<Arc<Vec<u8>>>,
     platform: Platform,
 }
 impl Stream {
-    pub fn new(filename: &str, url: &str, id: u32, filepath: &str, file_header: Option<Arc<Vec<u8>>>, platform: Platform) -> Self {
+    pub fn new(filename: &str, url: &str, id: u32, filepath: &Path, file_header: Option<Arc<Vec<u8>>>, platform: Platform) -> Self {
         Self {
             filename: filename.to_string(),
             url: url.to_string(),
             id,
             index: 0,
-            filepath: filepath.to_string(),
+            stream_path: filepath.to_path_buf(),
             file: None,
             last: None,
             file_header,
@@ -166,7 +169,7 @@ impl Stream {
         if data.len() < 10000 {
             return Ok(());
         }
-        let mut file = fs::File::create_new(&self.filepath).map_err(e!())?;
+        let mut file = fs::File::create_new(&self.stream_path).map_err(e!())?;
         if let Some(header) = &self.file_header {
             file.write_all(header).map_err(e!())?;
         }
@@ -180,7 +183,7 @@ impl Drop for Stream {
     /// removes downloaded stream file
     fn drop(&mut self) {
         if self.file.is_some() {
-            _ = fs::remove_file(&self.filepath)
+            _ = fs::remove_file(&self.stream_path);
         }
     }
 }

@@ -1,5 +1,4 @@
-use any::Any;
-use std::*;
+use std::{any::Any, *};
 #[macro_export]
 /// for mapping errors that contain a known string
 macro_rules! s {
