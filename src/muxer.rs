@@ -142,7 +142,7 @@ fn mkvmerge(mkvmerge_path: &str, streams: &Vec<Arc<RwLock<Stream>>>, filepath: &
 /// muxes streams with ffmpeg pipe
 fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<Stream>>>, filepath: &Path, pf: &Platform) -> Result<()> {
     let mut filepath = filepath.to_path_buf();
-    filepath.push("mkv");
+    filepath.set_extension("mkv");
     let container_type = match pf {
         Platform::CB => "mpegts",
         Platform::MFC => "mpegts",
