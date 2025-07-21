@@ -3,6 +3,7 @@ pub mod cb;
 pub mod mfc;
 pub mod sc;
 pub mod scvr;
+pub mod soda;
 
 use crate::{
     h, o, s,
@@ -21,6 +22,7 @@ pub enum Platform {
     SCVR,
     MFC,
     BONGA,
+    SODA,
 }
 impl Platform {
     pub fn new(key: &str) -> Option<Self> {
@@ -30,6 +32,7 @@ impl Platform {
             "SC" => Some(Self::SC),
             "SCVR" => Some(Self::SCVR),
             "BONGA" => Some(Self::BONGA),
+            "SODA" => Some(Self::SODA),
             _ => None,
         }
     }
@@ -40,6 +43,7 @@ impl Platform {
             Self::SC => sc::parse_playlist,
             Self::SCVR => scvr::parse_playlist,
             Self::BONGA => bonga::parse_playlist,
+            Self::SODA => soda::parse_playlist,
         }
     }
     fn get_playlist(&self) -> fn(&str) -> Result<Option<String>> {
@@ -49,6 +53,7 @@ impl Platform {
             Self::SC => sc::get_playlist,
             Self::SCVR => scvr::get_playlist,
             Self::BONGA => bonga::get_playlist,
+            Self::SODA => soda::get_playlist,
         }
     }
     pub fn referer(&self) -> &'static str {
@@ -58,6 +63,7 @@ impl Platform {
             Self::SC => "https://stripchat.com/",
             Self::SCVR => "https://vr.stripchat.com/",
             Self::BONGA => "https://bongacams.com/",
+            Self::SODA => "https://www.camsoda.com/",
         }
     }
 }
