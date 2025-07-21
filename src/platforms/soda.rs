@@ -15,13 +15,13 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
     let json_string = re_match.find(&html).ok_or_else(o!())?.as_str();
     let json: serde_json::Value = serde_json::from_str(&format!("{{{}}}", json_string)).map_err(e!())?;
     let json = &json["stream"];
-    let hostname_array = json.get("edge_servers").ok_or_else(o!())?.as_array().ok_or_else(o!())?;
+    let hostname_array = json["edge_servers"].as_array().ok_or_else(o!())?;
     if hostname_array.len() == 0 {
         return Ok(None);
     }
-    let hostname = hostname_array.get(0).ok_or_else(o!())?.as_str().ok_or_else(o!())?;
-    let stream_name = json.get("stream_name").ok_or_else(o!())?.as_str().ok_or_else(o!())?;
-    let token = json.get("token").ok_or_else(o!())?.as_str().ok_or_else(o!())?;
+    let hostname = hostname_array[0].as_str().ok_or_else(o!())?;
+    let stream_name = json["stream_name"].as_str().ok_or_else(o!())?;
+    let token = json["token"].as_str().ok_or_else(o!())?;
     let playlist_url = format!(
         "https://{}/{}_v1/index.ll.m3u8?multitrack=true&filter=tracks:v4v3v2v1a1a2&token={}",
         hostname, stream_name, token
