@@ -1,7 +1,7 @@
 use crate::{abort, e, muxer, platforms::Platform, s, util};
 use std::{
     io::{Seek, Write},
-    path::{Path,PathBuf},
+    path::{Path, PathBuf},
     sync::{Arc, RwLock},
     *,
 };
@@ -57,11 +57,17 @@ impl Playlist {
     }
     /// Main Playlist Loop
     pub fn playlist(&mut self) -> Result<()> {
+        let mut trys = 0;
         while !self.abort_get().map_err(s!())? && !abort::get().map_err(s!())? {
             if self.update_playlist().is_err() {
                 break;
             }
+            trys += 1;
+            if trys > 10 {
+                break;
+            }
             for stream in self.parse_playlist() {
+                trys = 0;
                 if let Some(last) = &self.last_stream {
                     if stream <= *last.read().map_err(s!())? {
                         continue;
