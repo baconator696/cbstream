@@ -4,7 +4,7 @@ type Result<T> = result::Result<T, Box<dyn error::Error>>;
 pub fn get_playlist(username: &str) -> Result<Option<String>> {
     let headers = util::create_headers(serde_json::json!({
         "user-agent": util::get_useragent().map_err(s!())?,
-        "referer": format!("{}{}",Platform::CB.referer(),username),
+        "referer": format!("{}{}",Platform::SODA.referer(),username),
 
     }))
     .map_err(s!())?;
