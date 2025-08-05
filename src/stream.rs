@@ -67,12 +67,12 @@ impl Playlist {
                 break;
             }
             for stream in self.parse_playlist() {
-                trys = 0;
                 if let Some(last) = &self.last_stream {
                     if stream <= *last.read().map_err(s!())? {
                         continue;
                     }
                 }
+                trys = 0;
                 let stream = Arc::new(RwLock::new(stream));
                 let s = stream.clone();
                 let l = self.last_stream.clone();
