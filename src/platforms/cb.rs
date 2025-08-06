@@ -2,6 +2,7 @@ use crate::{e, o, platforms::Platform, s, stream, util};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 pub fn get_playlist(username: &str) -> Result<Option<String>> {
+    let username = username.to_lowercase();
     let headers = util::create_headers(serde_json::json!({
         "user-agent": util::get_useragent().map_err(s!())?,
         "referer": format!("{}{}",Platform::CB.referer(),username),
