@@ -1,7 +1,6 @@
 use crate::{e, o, s};
 use std::{
     collections::HashMap,
-    io::Read,
     path::{Path, PathBuf},
     sync::{Arc, OnceLock, RwLock},
     *,
@@ -35,24 +34,10 @@ pub fn get_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String>
             client.get(url)
         };
         let resp = build.send().map_err(e!())?;
-        let resp_code = resp.status();
-        let resp_text = if let Some(v) = resp.headers().get("content-encoding") {
-            if v.to_str().map_err(e!())? == "gzip" {
-                let resp_data = resp.bytes().map_err(e!())?.to_vec();
-                let mut resp_text = String::new();
-                let mut decoder = flate2::read::GzDecoder::new(resp_data.as_slice());
-                decoder.read_to_string(&mut resp_text).map_err(e!())?;
-                resp_text
-            } else {
-                resp.text().map_err(e!())?
-            }
-        } else {
-            resp.text().map_err(e!())?
-        };
-        if resp_code != 200 {
-            return Err(format!("{}", resp_code))?;
+        if resp.status() != 200 {
+            return Err(format!("{}-{}", resp.status(), resp.text().map_err(e!())?))?;
         }
-        Ok(resp_text)
+        Ok(resp.text().map_err(e!())?)
     };
     let mut r = Err("".into());
     for _ in 0..retry {
@@ -80,9 +65,8 @@ pub fn get_retry_vec(url: &str, retry: i32, headers: Option<&HashMap<String, Str
             client.get(url)
         };
         let resp = build.send().map_err(e!())?;
-        let resp_code = resp.status();
-        if resp_code != 200 {
-            return Err(format!("{}", resp_code))?;
+        if resp.status() != 200 {
+            return Err(format!("{}-{}", resp.status(), resp.text().map_err(e!())?))?;
         }
         Ok(resp.bytes().map_err(e!())?.to_vec())
     };
@@ -111,30 +95,15 @@ pub fn post_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String
         } else {
             client.post(url)
         };
-
         let resp = build
             .body(payload.to_string())
             .header("content-type", content_type)
             .send()
             .map_err(e!())?;
-        let resp_code = resp.status();
-        let resp_text = if let Some(v) = resp.headers().get("content-encoding") {
-            if v.to_str().map_err(e!())? == "gzip" {
-                let resp_data = resp.bytes().map_err(e!())?.to_vec();
-                let mut resp_text = String::new();
-                let mut decoder = flate2::read::GzDecoder::new(resp_data.as_slice());
-                decoder.read_to_string(&mut resp_text).map_err(e!())?;
-                resp_text
-            } else {
-                resp.text().map_err(e!())?
-            }
-        } else {
-            resp.text().map_err(e!())?
-        };
-        if resp_code != 200 {
-            return Err(format!("{}", resp_code))?;
+        if resp.status() != 200 {
+            return Err(format!("{}-{}", resp.status(), resp.text().map_err(e!())?))?;
         }
-        Ok(resp_text)
+        Ok(resp.text().map_err(e!())?)
     };
     let mut r = Err("".into());
     for _ in 0..retry {
@@ -174,7 +143,6 @@ pub fn temp_dir() -> Result<PathBuf> {
     temp_dir.push("cbstream");
     Ok(temp_dir)
 }
-// creates temp directory
 pub fn create_dir(dir: &Path) -> Result<()> {
     match fs::create_dir_all(dir) {
         Err(e) => {
@@ -189,7 +157,6 @@ pub fn create_dir(dir: &Path) -> Result<()> {
     .map_err(e!())?;
     Ok(())
 }
-// returns url prefix
 pub fn url_prefix(url: &str) -> Option<&str> {
     let n = url.rfind("/")?;
     url.get(..n)
