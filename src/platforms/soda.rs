@@ -1,6 +1,10 @@
 use crate::{e, o, platforms::Platform, s, stream, util};
-use std::*;
+use std::{
+    sync::{Arc, OnceLock},
+    *,
+};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
+static REGEX_GET: OnceLock<Arc<regex::Regex>> = OnceLock::new();
 pub fn get_playlist(username: &str) -> Result<Option<String>> {
     let headers = util::create_headers(serde_json::json!({
         "user-agent": util::get_useragent().map_err(s!())?,
@@ -11,8 +15,8 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
     // get model playlist link
     let url = format!("https://www.camsoda.com/{}", username);
     let html = util::get_retry(&url, 1, Some(&headers)).map_err(s!())?;
-    let re_match = regex::Regex::new(r#""stream":[^\}]+\}"#).map_err(e!())?;
-    let json_string = re_match.find(&html).ok_or_else(o!())?.as_str();
+    let re: &Arc<regex::Regex> = REGEX_GET.get_or_init(|| regex::Regex::new(r#""stream":[^\}]+\}"#).unwrap().into());
+    let json_string = re.find(&html).ok_or_else(o!())?.as_str();
     let json: serde_json::Value = serde_json::from_str(&format!("{{{}}}", json_string)).map_err(e!())?;
     let json = &json["stream"];
     let hostname_array = json["edge_servers"].as_array().ok_or_else(o!())?;
@@ -36,6 +40,7 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
     }
     Ok(None)
 }
+static REGEX_PARSE: OnceLock<Arc<regex::Regex>> = OnceLock::new();
 pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Stream>> {
     let temp_dir = util::temp_dir().map_err(s!())?;
     util::create_dir(&temp_dir).map_err(s!())?;
@@ -75,7 +80,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
             continue;
         }
         // parse stream id
-        let re = regex::Regex::new(r"-(\d*).llhls.mp4").map_err(e!())?;
+        let re = REGEX_PARSE.get_or_init(|| regex::Regex::new(r"-(\d*).llhls.mp4").unwrap().into());
         let id = re
             .captures(line)
             .ok_or_else(o!())?
