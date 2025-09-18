@@ -1,3 +1,5 @@
+use sha2::Digest;
+
 use crate::{e, o, platforms::Platform, s, stream, util};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
@@ -9,6 +11,7 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
 pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Stream>> {
     sc_parse_playlist(playlist, false)
 }
+
 pub fn sc_get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
     let platform = if vr { Platform::SCVR } else { Platform::SC };
     let headers = util::create_headers(serde_json::json!({
@@ -39,21 +42,50 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
         Ok(r) => r,
         Err(_) => return Ok(None),
     };
+    let mut playlist_url = None;
     for line in playlist.lines() {
         if line.len() < 5 || &line[..1] == "#" {
             continue;
         }
-        return Ok(Some(line.to_string()));
+        playlist_url = Some(line.to_string());
     }
-    return Ok(None);
+    if playlist.contains("EXT-X-MOUFLON") {
+        for line in playlist.lines() {
+            if !line.contains("EXT-X-MOUFLON") {
+                continue;
+            }
+            let segments: Vec<&str> = line.split(":").collect();
+            let psch = segments.get(2).ok_or_else(o!())?;
+            let pkey = segments.get(3).ok_or_else(o!())?;
+            if let Some(url) = playlist_url {
+                let playlist_url_append = format!("{}?&psch={}&pkey={}", url, psch, pkey);
+                playlist_url = Some(playlist_url_append)
+            }
+        }
+    }
+    return Ok(playlist_url);
 }
+
+static PSCH: phf::Map<&'static str, &'static str> = phf::phf_map! {
+    "Zokee2OhPh9kugh4" => "Quean4cai9boJa5a",
+};
+
 pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Vec<stream::Stream>> {
     let platform = if vr { Platform::SCVR } else { Platform::SC };
     let temp_dir = util::temp_dir().map_err(s!())?;
     util::create_dir(&temp_dir).map_err(s!())?;
     let mut streams = Vec::new();
     let mut date: Option<String> = None;
-    for line in playlist.playlist.as_ref().ok_or_else(o!())?.lines() {
+    let mut key: Option<&str> = None;
+    let iter: Vec<(usize, &str)> = playlist.playlist.as_ref().ok_or_else(o!())?.lines().enumerate().collect();
+    for (n, line) in &iter {
+        // get m3u8 encryption key
+        if key.is_none() {
+            if line.contains("#EXT-X-MOUFLON:PSCH") {
+                let segments: Vec<&str> = line.split(":").collect();
+                key = Some(PSCH[*(segments.get(3).ok_or_else(o!())?)])
+            }
+        }
         // parse MP4 header
         if playlist.mp4_header.is_none() {
             if line.contains("EXT-X-MAP:URI") {
@@ -87,9 +119,38 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
             continue;
         }
         // parse relevant information
-        let url = line.to_string();
+        let url = if key.is_none() {
+            line.to_string()
+        } else { // ENCRYPTED FILENAME
+            // preprare key
+            let key = key.ok_or_else(o!())?.as_bytes();
+            let mut sha256_hasher = sha2::Sha256::new();
+            sha256_hasher.update(key);
+            let key = sha256_hasher.finalize().to_vec();
+            // preprare encrypted string
+            let (_, mouflon) = &iter[n.saturating_sub(1)];
+            let mut encoded_str = mouflon.split(":").last().ok_or_else(o!())?.to_string();
+            if encoded_str.len() % 4 != 0 {
+                for _ in 0..(encoded_str.len() % 4) {
+                    encoded_str.push('=');
+                }
+            }
+            use base64::{Engine, engine::general_purpose::STANDARD};
+            let mut encrypted_bytes = STANDARD.decode(encoded_str).map_err(e!())?;
+            // XOR Decrypt
+            let mut i = 0;
+            while i < encrypted_bytes.len() {
+                encrypted_bytes[i] = encrypted_bytes[i] ^ key[i % key.len()];
+                i += 1;
+            }
+            // url prefix
+            let line_split: Vec<&str> = line.split("/").collect();
+            let prefix = line_split[..line_split.len().saturating_sub(1)].join("/");
+            // decrypted output
+            format!("{}/{}", prefix, String::from_utf8_lossy(&encrypted_bytes))
+        };
         // parse stream id
-        let id = line.split("_").last().ok_or_else(o!())?;
+        let id = url.split("_").last().ok_or_else(o!())?;
         let n = id.find(".").ok_or_else(o!())?;
         let id = id[..n].trim().parse::<u32>().map_err(e!())?;
         // parse filename
