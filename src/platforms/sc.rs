@@ -1,5 +1,3 @@
-use sha2::Digest;
-
 use crate::{e, o, platforms::Platform, s, stream, util};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
@@ -121,9 +119,11 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
         // parse relevant information
         let url = if key.is_none() {
             line.to_string()
-        } else { // ENCRYPTED FILENAME
+        } else {
+            //// ENCRYPTED FILENAME
             // preprare key
             let key = key.ok_or_else(o!())?.as_bytes();
+            use sha2::Digest;
             let mut sha256_hasher = sha2::Sha256::new();
             sha256_hasher.update(key);
             let key = sha256_hasher.finalize().to_vec();
@@ -143,11 +143,12 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
                 encrypted_bytes[i] = encrypted_bytes[i] ^ key[i % key.len()];
                 i += 1;
             }
-            // url prefix
-            let line_split: Vec<&str> = line.split("/").collect();
-            let prefix = line_split[..line_split.len().saturating_sub(1)].join("/");
             // decrypted output
-            format!("{}/{}", prefix, String::from_utf8_lossy(&encrypted_bytes))
+            format!(
+                "{}/{}",
+                util::url_prefix(&line).ok_or_else(o!())?,
+                String::from_utf8_lossy(&encrypted_bytes)
+            )
         };
         // parse stream id
         let id = url.split("_").last().ok_or_else(o!())?;
