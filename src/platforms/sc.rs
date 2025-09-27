@@ -131,7 +131,7 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
             let (_, mouflon) = &iter[n.saturating_sub(1)];
             let mut encoded_str = mouflon.split(":").last().ok_or_else(o!())?.to_string();
             if encoded_str.len() % 4 != 0 {
-                for _ in 0..(encoded_str.len() % 4) {
+                for _ in 0..(4 - (encoded_str.len() % 4)) {
                     encoded_str.push('=');
                 }
             }
