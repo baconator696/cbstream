@@ -20,7 +20,10 @@ impl FileManage {
 }
 impl Drop for FileManage {
     fn drop(&mut self) {
-        _ = fs::remove_file(&self.0);
+        match fs::remove_file(&self.0).map_err(e!()) {
+            Err(e) => eprintln!("{}", e),
+            _ => (),
+        };
     }
 }
 /// checks if mkvtoolnix is installed and returns path of mkvmerger

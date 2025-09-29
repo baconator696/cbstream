@@ -188,7 +188,10 @@ impl Drop for Stream {
     /// removes downloaded stream file
     fn drop(&mut self) {
         if self.file.is_some() {
-            _ = fs::remove_file(&self.stream_path);
+            match fs::remove_file(&self.stream_path).map_err(e!()) {
+                Err(e) => eprintln!("{}", e),
+                _ => (),
+            };
         }
     }
 }
