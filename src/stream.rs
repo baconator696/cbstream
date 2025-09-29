@@ -66,18 +66,22 @@ impl Playlist {
             if trys > 10 {
                 break;
             }
-            for stream in self.parse_playlist() {
+            for mut stream in self.parse_playlist() {
                 if let Some(last) = &self.last_stream {
                     if stream <= *last.read().map_err(s!())? {
                         continue;
                     }
                 }
                 trys = 0;
+                stream.last = self.last_stream.clone();
+                stream.index = match stream.last.as_ref() {
+                    Some(o) => o.read().map_err(s!())?.index + 1,
+                    None => 1,
+                };
                 let stream = Arc::new(RwLock::new(stream));
-                let s = stream.clone();
-                let l = self.last_stream.clone();
+                let s: Arc<RwLock<Stream>> = stream.clone();
                 thread::spawn(move || {
-                    (*s.write().unwrap()).download(l).unwrap();
+                    download(s).unwrap();
                 });
                 self.last_stream = Some(stream);
                 thread::sleep(time::Duration::from_millis(500));
@@ -151,39 +155,34 @@ impl Stream {
             platform,
         }
     }
-    /// downloads the stream given the Stream's url
-    pub fn download(&mut self, last: Option<Arc<RwLock<Stream>>>) -> Result<()> {
-        println!("{}_{}", self.filename, self.id);
-        self.index = match last.as_ref() {
-            Some(o) => o.read().map_err(s!())?.index,
-            None => 1,
-        };
-        self.last = last;
-        let headers = util::create_headers(serde_json::json!({
-            "user-agent": util::get_useragent().map_err(s!())?,
-            "referer": self.platform.referer(),
-
-        }))
-        .map_err(s!())?;
-        let data: Vec<u8> = match util::get_retry_vec(&self.url, 5, Some(&headers)).map_err(s!()) {
-            Ok(r) => r,
-            Err(e) => {
-                eprintln!("{}", e);
-                return Ok(());
-            }
-        };
-        if data.len() < 10000 {
+}
+/// downloads the stream given the Stream's url
+fn download(stream: Arc<RwLock<Stream>>) -> Result<()> {
+    println!("{}_{}", stream.read().map_err(s!())?.filename, stream.read().map_err(s!())?.id);
+    let headers = util::create_headers(serde_json::json!({
+        "user-agent": util::get_useragent().map_err(s!())?,
+        "referer": stream.read().map_err(s!())?.platform.referer(),
+    }))
+    .map_err(s!())?;
+    let data: Vec<u8> = match util::get_retry_vec(&stream.read().map_err(s!())?.url, 5, Some(&headers)).map_err(s!()) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("{}", e);
             return Ok(());
         }
-        let mut file = fs::File::create_new(&self.stream_path).map_err(e!())?;
-        if let Some(header) = &self.file_header {
-            file.write_all(header).map_err(e!())?;
-        }
-        file.write_all(&data).map_err(e!())?;
-        file.seek(io::SeekFrom::Start(0)).map_err(e!())?;
-        self.file = Some(file);
-        Ok(())
+    };
+    if data.len() < 10000 {
+        return Ok(());
     }
+    let mut file = fs::File::create_new(&stream.read().map_err(s!())?.stream_path).map_err(e!())?;
+    if let Some(header) = &stream.read().map_err(s!())?.file_header {
+        file.write_all(header).map_err(e!())?;
+    }
+    file.write_all(&data).map_err(e!())?;
+    file.seek(io::SeekFrom::Start(0)).map_err(e!())?;
+    let mut s = stream.write().map_err(s!())?;
+    s.file = Some(file);
+    Ok(())
 }
 impl Drop for Stream {
     /// removes downloaded stream file
