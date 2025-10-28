@@ -48,7 +48,7 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
         playlist_url = Some(line.to_string());
     }
     if playlist.contains("EXT-X-MOUFLON") {
-        for line in playlist.lines() {
+        for line in playlist.lines().rev() {
             if !line.contains("EXT-X-MOUFLON") {
                 continue;
             }
@@ -57,7 +57,8 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
             let pkey = segments.get(3).ok_or_else(o!())?;
             if let Some(url) = playlist_url {
                 let playlist_url_append = format!("{}?&psch={}&pkey={}", url, psch, pkey);
-                playlist_url = Some(playlist_url_append)
+                playlist_url = Some(playlist_url_append);
+                break;
             }
         }
     }
