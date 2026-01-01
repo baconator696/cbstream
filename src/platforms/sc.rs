@@ -1,5 +1,8 @@
 use crate::{e, o, platforms::Platform, s, stream, util};
-use std::*;
+use std::{
+    sync::{Arc, OnceLock},
+    *,
+};
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 #[inline]
 pub fn get_playlist(username: &str) -> Result<Option<String>> {
@@ -9,7 +12,6 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
 pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Stream>> {
     sc_parse_playlist(playlist, false)
 }
-
 pub fn sc_get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
     let platform = if vr { Platform::SCVR } else { Platform::SC };
     let headers = util::create_headers(serde_json::json!({
@@ -67,7 +69,10 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
 
 static PSCH: phf::Map<&'static str, &'static str> = phf::phf_map! {
     "Zokee2OhPh9kugh4" => "Quean4cai9boJa5a",
+    "Ook7quaiNgiyuhai" => "EQueeGh2kaewa3ch",
 };
+
+static REGEX_ENCRY_TERM: OnceLock<Arc<regex::Regex>> = OnceLock::new();
 
 pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Vec<stream::Stream>> {
     let platform = if vr { Platform::SCVR } else { Platform::SC };
@@ -123,33 +128,38 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
         } else {
             //// ENCRYPTED FILENAME
             // preprare key
-            let key = key.ok_or_else(o!())?.as_bytes();
+            let key_bytes = key.ok_or_else(o!())?.as_bytes();
             use sha2::Digest;
             let mut sha256_hasher = sha2::Sha256::new();
-            sha256_hasher.update(key);
-            let key = sha256_hasher.finalize().to_vec();
+            sha256_hasher.update(key_bytes);
+            let key_bytes = sha256_hasher.finalize().to_vec();
             // preprare encrypted string
             let (_, mouflon) = &iter[n.saturating_sub(1)];
-            let mut encoded_str = mouflon.split(":").last().ok_or_else(o!())?.to_string();
-            if encoded_str.len() % 4 != 0 {
-                for _ in 0..(4 - (encoded_str.len() % 4)) {
-                    encoded_str.push('=');
+            let encoded_url = format!("https:{}", mouflon.split(":").last().ok_or_else(o!())?);
+            // use stripchat's REGEX pattern to get encrypted string
+            let re: &Arc<regex::Regex> =
+                REGEX_ENCRY_TERM.get_or_init(|| regex::Regex::new(r"_([^_]+)_(\d+(?:_part\d+)?)\.mp4(?:[?#].*)?").unwrap().into());
+            let re_captures = re.captures(&encoded_url).ok_or_else(o!())?;
+            let encrypted_str = re_captures.get(1).ok_or_else(o!())?.as_str().to_string();
+            // reverse string
+            let mut encrypted_str_rev: String = encrypted_str.chars().rev().collect();
+            if encrypted_str_rev.len() % 4 != 0 {
+                for _ in 0..(4 - (encrypted_str_rev.len() % 4)) {
+                    encrypted_str_rev.push('=');
                 }
             }
             use base64::{Engine, engine::general_purpose::STANDARD};
-            let mut encrypted_bytes = STANDARD.decode(encoded_str).map_err(e!())?;
+            let mut encrypted_bytes = STANDARD.decode(encrypted_str_rev).map_err(e!())?;
             // XOR Decrypt
             let mut i = 0;
             while i < encrypted_bytes.len() {
-                encrypted_bytes[i] = encrypted_bytes[i] ^ key[i % key.len()];
+                encrypted_bytes[i] = encrypted_bytes[i] ^ key_bytes[i % key_bytes.len()];
                 i += 1;
             }
+            let decrypted_str = String::from_utf8_lossy(&encrypted_bytes);
+            println!("{}", String::from_utf8_lossy(&encrypted_bytes));
             // decrypted output
-            format!(
-                "{}/{}",
-                util::url_prefix(&line).ok_or_else(o!())?,
-                String::from_utf8_lossy(&encrypted_bytes)
-            )
+            encoded_url.replace(&encrypted_str, &decrypted_str)
         };
         // parse stream id
         let id = url.split("_").last().ok_or_else(o!())?;
