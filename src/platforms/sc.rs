@@ -157,7 +157,6 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
                 i += 1;
             }
             let decrypted_str = String::from_utf8_lossy(&encrypted_bytes);
-            println!("{}", String::from_utf8_lossy(&encrypted_bytes));
             // decrypted output
             encoded_url.replace(&encrypted_str, &decrypted_str)
         };
