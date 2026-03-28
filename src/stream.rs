@@ -1,4 +1,4 @@
-use crate::{abort, e, muxer, platforms::Platform, s, util};
+use crate::{abort, debug_eprintln, e, muxer, platforms::Platform, s, util};
 use std::{
     io::{Seek, Write},
     path::{Path, PathBuf},
@@ -59,7 +59,9 @@ impl Playlist {
     pub fn playlist(&mut self) -> Result<()> {
         let mut trys = 0;
         while !self.abort_get().map_err(s!())? && !abort::get().map_err(s!())? {
-            if self.update_playlist().is_err() {
+            let state = self.update_playlist();
+            if state.is_err() {
+                debug_eprintln!("{:?}", state.unwrap_err());
                 break;
             }
             trys += 1;
@@ -172,6 +174,7 @@ fn download(stream: Arc<RwLock<Stream>>) -> Result<()> {
         }
     };
     if data.len() < 10000 {
+        debug_eprintln!("{}",String::from_utf8_lossy(&data));
         return Ok(());
     }
     let mut file = fs::File::create_new(&stream.read().map_err(s!())?.stream_path).map_err(e!())?;

@@ -54,3 +54,11 @@ pub fn header_cast(e: Box<dyn Any + Send>) -> String {
         "unknown panic".into()
     }
 }
+#[macro_export]
+macro_rules! debug_eprintln {
+    ($($arg:tt)*) => {
+        if env::var("DEBUG").is_ok() {
+            println!($($arg)*);
+        }
+    };
+}

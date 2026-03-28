@@ -1,4 +1,4 @@
-use crate::{e, o, platforms::Platform, s, stream, util};
+use crate::{debug_eprintln, e, o, platforms::Platform, s, stream, util};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 pub fn get_playlist(username: &str) -> Result<Option<String>> {
@@ -15,6 +15,7 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
         Ok(r) => Ok(r),
         Err(e) => {
             if e.contains("Unauthorized") {
+                debug_eprintln!("{}",e);
                 return Ok(None);
             }
             Err(e)
