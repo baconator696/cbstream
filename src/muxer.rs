@@ -235,7 +235,7 @@ fn ffmpeg(ffmpeg_path: &str, streams: &Vec<Arc<RwLock<Stream>>>, filepath: &Path
     return Ok(());
 }
 /// Main Muxing Function
-pub fn muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &Path, pf: Platform) -> Result<()> {
+pub fn muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &Path, filepath_audio: Option<PathBuf>, pf: Platform) -> Result<()> {
     if let Some(ffmpeg_path) = ffmpeg_exists().map_err(s!())? {
         match ffmpeg(ffmpeg_path, streams, filepath, &pf) {
             Err(e) => eprintln!("{}", e),
@@ -248,11 +248,11 @@ pub fn muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &Path, pf: Platform) 
             Ok(_) => return Ok(()),
         }
     }
-    local_muxer(streams, filepath, pf).map_err(s!())?;
+    local_muxer(streams, filepath, filepath_audio, pf).map_err(s!())?;
     Ok(())
 }
 /// Fallback local muxer
-fn local_muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &Path, pf: Platform) -> Result<()> {
+fn local_muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &Path, filepath_audio: Option<PathBuf>, pf: Platform) -> Result<()> {
     let extension = match pf {
         Platform::CB => "ts",
         Platform::MFC => "ts",
@@ -265,6 +265,13 @@ fn local_muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &Path, pf: Platform
     filepath.set_extension(extension);
     // creates file
     let mut file = fs::OpenOptions::new().create(true).append(true).open(filepath).map_err(e!())?;
+    let mut file_audio = if let Some(filepath_audio) = filepath_audio {
+        let mut filepath_audio = filepath_audio.to_path_buf();
+        filepath_audio.set_extension(extension);
+        Some(fs::OpenOptions::new().create(true).append(true).open(filepath_audio).map_err(e!())?)
+    } else {
+        None
+    };
     // muxes stream to file
     for stream in streams {
         let mut buffer = vec![0u8; 1 << 16];
@@ -278,6 +285,19 @@ fn local_muxer(streams: &Vec<Arc<RwLock<Stream>>>, filepath: &Path, pf: Platform
                 file.write_all(&buffer[..n]).map_err(e!())?;
             }
             fs::remove_file(&s.stream_path).map_err(e!())?;
+        }
+        if file_audio.is_some() {
+            let mut buffer = vec![0u8; 1 << 16];
+            if let Some(mut f) = s.file_audio.take() {
+                loop {
+                    let n = f.read(&mut buffer).map_err(e!())?;
+                    if n == 0 {
+                        break;
+                    }
+                    file_audio.as_mut().unwrap().write_all(&buffer[..n]).map_err(e!())?;
+                }
+                fs::remove_file(&s.stream_path_audio).map_err(e!())?;
+            }
         }
     }
     Ok(())

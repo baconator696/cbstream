@@ -128,8 +128,15 @@ impl Playlist {
         // creates filename
         let filename = streams[0].read().map_err(s!())?.filename.clone();
         let mut filepath = PathBuf::from(&self.username);
+        let mut filepath_audio = filepath.clone();
         filepath.push(&filename);
-        muxer::muxer(&streams, &filepath, self.platform.clone())?;
+        let filepath_audio_option = if streams[0].read().map_err(s!())?.url_audio.is_some() {
+            filepath_audio.push(format!("{}_audio", filename));
+            Some(filepath_audio)
+        } else {
+            None
+        };
+        muxer::muxer(&streams, &filepath, filepath_audio_option, self.platform.clone())?;
         Ok(())
     }
 }
@@ -141,9 +148,9 @@ pub struct Stream {
     index: u32,
     pub stream_path: path::PathBuf,
     /// audio path generated when downloaded
-    stream_path_audio: path::PathBuf,
+    pub stream_path_audio: path::PathBuf,
     pub file: Option<fs::File>,
-    file_audio: Option<fs::File>,
+    pub file_audio: Option<fs::File>,
     pub last: Option<Arc<RwLock<Stream>>>,
     file_header: Option<Arc<Vec<u8>>>,
     file_header_audio: Option<Arc<Vec<u8>>>,
@@ -202,6 +209,7 @@ fn download(stream: Arc<RwLock<Stream>>) -> Result<()> {
         }
     };
     let mut data_audio: Option<Vec<u8>> = None;
+    // for seperate audio track
     if let Some(url_audio) = &stream.read().map_err(s!())?.url_audio {
         let data: Vec<u8> = match util::get_retry_vec(url_audio, 5, Some(&headers)).map_err(s!()) {
             Ok(r) => r,
@@ -226,6 +234,7 @@ fn download(stream: Arc<RwLock<Stream>>) -> Result<()> {
     file.seek(io::SeekFrom::Start(0)).map_err(e!())?;
     let mut s = stream.write().map_err(s!())?;
     s.file = Some(file);
+    // for seperate audio track
     if let Some(data_audio) = data_audio {
         let mut file_audio = fs::File::create_new(&stream.read().map_err(s!())?.stream_path_audio).map_err(e!())?;
         if let Some(header_audio) = &stream.read().map_err(s!())?.file_header_audio {
