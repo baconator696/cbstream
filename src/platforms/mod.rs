@@ -154,7 +154,7 @@ impl Model {
         let downloading = self.downloading.clone();
         *downloading.write().map_err(s!())? = true;
         let handle = thread::spawn(move || {
-            Playlist::new(platform, username, playlist_url, abort, downloading, None)
+            Playlist::new(platform, username, playlist_url, abort, downloading, None, None)
                 .playlist()
                 .unwrap();
         });

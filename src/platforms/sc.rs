@@ -173,9 +173,11 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
         streams.push(stream::Stream::new(
             &filename,
             &url,
+            None,
             id,
             &filepath,
             playlist.mp4_header.clone(),
+            None,
             platform.clone(),
         ));
     }

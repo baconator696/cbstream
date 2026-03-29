@@ -55,7 +55,11 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
                 if header_url_split.len() < 2 {
                     return Err("can not get mp4 header file".into());
                 }
-                let header_url = format!("{}/{}", playlist.url_prefix().ok_or_else(o!())?, header_url_split[1]);
+                let header_url = format!(
+                    "{}/{}",
+                    util::url_prefix(&playlist.playlist_url, header_url_split[1]).ok_or_else(o!())?,
+                    header_url_split[1]
+                );
                 let http_headers = util::create_headers(serde_json::json!({
                     "user-agent": util::get_useragent().map_err(s!())?,
                     "referer": Platform::SODA.referer(),
@@ -97,9 +101,11 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
         streams.push(stream::Stream::new(
             &filename,
             line.into(),
+            None,
             id,
             &filepath,
             playlist.mp4_header.clone(),
+            None,
             Platform::SODA,
         ));
     }

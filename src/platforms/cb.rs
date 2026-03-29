@@ -15,7 +15,7 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
         Ok(r) => Ok(r),
         Err(e) => {
             if e.contains("Unauthorized") {
-                debug_eprintln!("{}",e);
+                debug_eprintln!("{}", e);
                 return Ok(None);
             }
             Err(e)
@@ -32,7 +32,7 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
         if line.len() < 5 || &line[..1] == "#" {
             continue;
         }
-        let playlist_link = Some(format!("{}/{}", util::url_prefix(playlist_url).ok_or_else(o!())?, line));
+        let playlist_link = Some(format!("{}/{}", util::url_prefix(playlist_url, line).ok_or_else(o!())?, line));
         return Ok(playlist_link);
     }
     Ok(None)
@@ -56,7 +56,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
         if line.len() == 0 || &line[..1] == "#" {
             continue;
         }
-        let full_url = format!("{}/{}", playlist.url_prefix().ok_or_else(o!())?, line);
+        let full_url = format!("{}/{}", util::url_prefix(&playlist.playlist_url, line).ok_or_else(o!())?, line);
         // parse stream id
         let id = line.split("_").last().ok_or_else(o!())?;
         let n = id.find(".").ok_or_else(o!())?;
@@ -66,7 +66,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
         let filename = format!("CB_{}_{}", playlist.username, date);
         let mut filepath = path::PathBuf::from(&temp_dir);
         filepath.push(format!("cb-{}-{}-{}.ts", playlist.username, date, id));
-        streams.push(stream::Stream::new(&filename, &full_url, id, &filepath, None, Platform::CB));
+        streams.push(stream::Stream::new(&filename, &full_url, None, id, &filepath, None, None, Platform::CB));
     }
 
     Ok(streams)

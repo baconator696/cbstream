@@ -37,7 +37,7 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
         if line.len() < 5 || &line[..1] == "#" {
             continue;
         }
-        let playlist_link = Some(format!("{}/{}", util::url_prefix(&playlist_url).ok_or_else(o!())?, line));
+        let playlist_link = Some(format!("{}/{}", util::url_prefix(&playlist_url, line).ok_or_else(o!())?, line));
         return Ok(playlist_link);
     }
     Ok(None)
@@ -51,7 +51,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
             continue;
         }
         // parse relevant information
-        let url = format!("{}/{}", playlist.url_prefix().ok_or_else(o!())?, line);
+        let url = format!("{}/{}", util::url_prefix(&playlist.playlist_url, line).ok_or_else(o!())?, line);
         // parse stream id
         let id_split = line.split("_").collect::<Vec<&str>>();
         let id_raw = *id_split.get(3).ok_or_else(o!())?;
@@ -61,7 +61,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
         let filename = format!("BC_{}_{}", playlist.username, date);
         let mut filepath = path::PathBuf::from(&temp_dir);
         filepath.push(format!("bc-{}-{}-{}.ts", playlist.username, date, id));
-        streams.push(stream::Stream::new(&filename, &url, id, &filepath, None, Platform::BONGA));
+        streams.push(stream::Stream::new(&filename, &url, None, id, &filepath, None, None, Platform::BONGA));
     }
     Ok(streams)
 }
