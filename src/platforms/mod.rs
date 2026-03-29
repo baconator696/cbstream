@@ -46,7 +46,7 @@ impl Platform {
             Self::SODA => soda::parse_playlist,
         }
     }
-    fn get_playlist(&self) -> fn(&str) -> Result<Option<String>> {
+    fn get_playlist(&self) -> fn(&str) -> Result<(Option<String>, Option<String>)> {
         match self {
             Self::CB => cb::get_playlist,
             Self::MFC => mfc::get_playlist,
@@ -72,6 +72,7 @@ pub struct Model {
     username: String,
     downloading: Arc<RwLock<bool>>,
     playlist_link: Option<String>,
+    playlist_audio_link: Option<String>,
     thread_handles: Vec<JoinHandle<()>>,
     abort: Arc<RwLock<bool>>,
 }
@@ -82,6 +83,7 @@ impl Model {
             username: username.to_string(),
             downloading: Arc::new(RwLock::new(false)),
             playlist_link: None,
+            playlist_audio_link: None,
             thread_handles: Vec::new(),
             abort: Arc::new(RwLock::new(false)),
         }
@@ -90,13 +92,15 @@ impl Model {
         format!("{:?}:{}", self.platform, self.username)
     }
     fn is_online(&mut self) -> bool {
-        self.playlist_link = match self.platform.get_playlist()(&self.username) {
+        let (playlist_link, playlist_audio_link) = match self.platform.get_playlist()(&self.username) {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("{}", e);
-                None
+                (None, None)
             }
         };
+        self.playlist_audio_link = playlist_audio_link;
+        self.playlist_link = playlist_link;
         self.playlist_link.is_some()
     }
     fn is_downloading(&self) -> Result<bool> {
@@ -150,11 +154,12 @@ impl Model {
         let username = self.username.clone();
         let abort = self.abort.clone();
         let playlist_url = self.playlist_link.clone().ok_or_else(o!())?;
+        let playlist_audio_url = self.playlist_audio_link.clone();
         let platform = self.platform.clone();
         let downloading = self.downloading.clone();
         *downloading.write().map_err(s!())? = true;
         let handle = thread::spawn(move || {
-            Playlist::new(platform, username, playlist_url, abort, downloading, None, None)
+            Playlist::new(platform, username, playlist_url, playlist_audio_url, abort, downloading, None, None)
                 .playlist()
                 .unwrap();
         });

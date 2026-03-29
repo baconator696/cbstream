@@ -1,7 +1,7 @@
 use crate::{e, o, platforms::Platform, s, stream, util};
 use std::*;
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
-pub fn get_playlist(username: &str) -> Result<Option<String>> {
+pub fn get_playlist(username: &str) -> Result<(Option<String>, Option<String>)> {
     let headers = util::create_headers(serde_json::json!({
         "user-agent": util::get_useragent().map_err(s!())?,
         "referer": format!("{}{}",Platform::MFC.referer(),username),
@@ -19,14 +19,14 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
     };
     let sessions = match json["result"]["user"]["sessions"].as_array() {
         Some(o) => o,
-        None => return Ok(None),
+        None => return Ok((None, None)),
     };
     if sessions.len() == 0 {
-        return Ok(None);
+        return Ok((None, None));
     }
     let server_name = sessions[0]["server_name"].as_str().ok_or_else(o!())?;
     if server_name.len() == 0 {
-        return Ok(None);
+        return Ok((None, None));
     }
     let phase = sessions[0]["phase"].as_str().ok_or_else(o!())?;
     let playform_id = sessions[0]["platform_id"].as_i64().ok_or_else(o!())?;
@@ -41,9 +41,9 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
             continue;
         }
         let playlist_link = format!("{}/{}", util::url_prefix(&playlist_url, line).ok_or_else(o!())?, line);
-        return Ok(Some(playlist_link));
+        return Ok((Some(playlist_link), None));
     }
-    return Ok(None);
+    return Ok((None, None));
 }
 pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Stream>> {
     let temp_dir = util::temp_dir().map_err(s!())?;

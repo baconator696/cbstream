@@ -10,7 +10,9 @@ pub struct Playlist {
     pub platform: Platform,
     pub username: String,
     pub playlist_url: String,
+    pub playlist_audio_url: Option<String>,
     pub playlist: Option<String>,
+    pub playlist_audio: Option<String>,
     last_stream: Option<Arc<RwLock<Stream>>>,
     abort: Arc<RwLock<bool>>,
     downloading: Arc<RwLock<bool>>,
@@ -24,6 +26,7 @@ impl Playlist {
         platform: Platform,
         username: String,
         playlist_url: String,
+        playlist_audio_url: Option<String>,
         abort: Arc<RwLock<bool>>,
         downloading: Arc<RwLock<bool>>,
         mp4_header: Option<Arc<Vec<u8>>>,
@@ -33,7 +36,9 @@ impl Playlist {
             platform,
             username,
             playlist_url,
+            playlist_audio_url,
             playlist: None,
+            playlist_audio: None,
             last_stream: None,
             abort,
             downloading,
@@ -49,8 +54,12 @@ impl Playlist {
 
         }))
         .map_err(s!())?;
-        let playlist = util::get_retry(&self.playlist_url, 5, Some(&headers))?;
+        let playlist = util::get_retry(&self.playlist_url, 5, Some(&headers)).map_err(s!())?;
         self.playlist = Some(playlist);
+        if let Some(playlist_audio_url) = &self.playlist_audio_url {
+            let playlist_audio = util::get_retry(playlist_audio_url, 5, Some(&headers)).map_err(s!())?;
+            self.playlist_audio = Some(playlist_audio);
+        }
         Ok(())
     }
     fn abort_get(&self) -> Result<bool> {
@@ -62,7 +71,7 @@ impl Playlist {
         while !self.abort_get().map_err(s!())? && !abort::get().map_err(s!())? {
             let state = self.update_playlist();
             if state.is_err() {
-                debug_eprintln!("{:?}", state.unwrap_err());
+                debug_eprintln!("{:?}", state.map_err(s!()).unwrap_err());
                 break;
             }
             trys += 1;
@@ -234,6 +243,7 @@ fn download(stream: Arc<RwLock<Stream>>) -> Result<()> {
     file.seek(io::SeekFrom::Start(0)).map_err(e!())?;
     let mut s = stream.write().map_err(s!())?;
     s.file = Some(file);
+    drop(s);
     // for seperate audio track
     if let Some(data_audio) = data_audio {
         let mut file_audio = fs::File::create_new(&stream.read().map_err(s!())?.stream_path_audio).map_err(e!())?;
