@@ -70,7 +70,6 @@ pub fn get_playlist(username: &str) -> Result<(Option<String>, Option<String>)> 
         }
         let space = if playlist_audio_url.is_some() {""} else {"/"};
         let playlist_url = Some(format!("{}{}{}", util::url_prefix(playlist_url, line).ok_or_else(o!())?, space, line));
-        println!("{:?},{:?}",playlist_url,playlist_audio_url);
         return Ok((playlist_url, playlist_audio_url));
     }
     Ok((None, None))
