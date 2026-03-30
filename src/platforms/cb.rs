@@ -63,7 +63,7 @@ pub fn get_playlist(username: &str) -> Result<(Option<String>, Option<String>)> 
 }
 pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Stream>> {
     if playlist.playlist_audio_url.is_some() {
-        return parse_playlist_audio_video(playlist);
+        return combine_playlist_audio_video(playlist);
     }
     let temp_dir = util::temp_dir().map_err(s!())?;
     util::create_dir(&temp_dir).map_err(s!())?;
@@ -99,21 +99,26 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
     Ok(streams)
 }
 
-fn parse_playlist_audio_video(playlist: &mut stream::Playlist) -> Result<Vec<stream::Stream>> {
+fn combine_playlist_audio_video(playlist: &mut stream::Playlist) -> Result<Vec<stream::Stream>> {
     let temp_dir = util::temp_dir().map_err(s!())?;
     util::create_dir(&temp_dir).map_err(s!())?;
     let mut streams = Vec::new();
-    let video_streams = parse_playlist_audio_video_internal(playlist, &temp_dir, false).map_err(s!())?;
-    let audio_streams = parse_playlist_audio_video_internal(playlist, &temp_dir, true).map_err(s!())?;
-    for (id, stream) in video_streams {
+    let video_streams = parse_playlist_audio_video(playlist, &temp_dir, false).map_err(s!())?;
+    let audio_streams = parse_playlist_audio_video(playlist, &temp_dir, true).map_err(s!())?;
+    let mut keys: Vec<_> = video_streams.keys().collect();
+    keys.sort();
+    for id in keys {
         if audio_streams.contains_key(&id) {
+            let filename = video_streams.get(&id).unwrap().filename.as_str();
+            let video_url = video_streams.get(&id).unwrap().url.as_str();
             let audio_url = Some(audio_streams.get(&id).unwrap().url.as_str());
+            let filepath = video_streams.get(&id).unwrap().filepath.as_ref();
             let new_stream = stream::Stream::new(
-                &stream.filename,
-                &stream.url,
+                filename,
+                video_url,
                 audio_url,
-                id,
-                &stream.filepath,
+                *id,
+                filepath,
                 playlist.mp4_header.clone(),
                 playlist.mp4_header_audio.clone(),
                 Platform::CB,
@@ -128,7 +133,7 @@ struct Info {
     filepath: PathBuf,
     filename: String,
 }
-fn parse_playlist_audio_video_internal(playlist: &mut stream::Playlist, temp_dir: &PathBuf, audio: bool) -> Result<HashMap<u32, Info>> {
+fn parse_playlist_audio_video(playlist: &mut stream::Playlist, temp_dir: &PathBuf, audio: bool) -> Result<HashMap<u32, Info>> {
     let mut date: Option<String> = None;
     let mut streams: HashMap<u32, Info> = HashMap::new();
     let playlist_text = if audio {
