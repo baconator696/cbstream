@@ -145,7 +145,8 @@ impl Playlist {
         } else {
             None
         };
-        muxer::muxer(&streams, &filepath, filepath_audio_option, self.platform.clone())?;
+        let streams = Arc::new(RwLock::new(streams));
+        muxer::muxer(streams, &filepath, filepath_audio_option, self.platform.clone())?;
         Ok(())
     }
 }
