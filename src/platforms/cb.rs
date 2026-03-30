@@ -7,7 +7,8 @@ use std::{
 };
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 
-static REGEX_ENCRY_TERM: OnceLock<Arc<regex::Regex>> = OnceLock::new();
+static REGEX_AUDIO_MATCH: OnceLock<Arc<regex::Regex>> = OnceLock::new();
+static REGEX_AUDIO_MATCH2: OnceLock<Arc<regex::Regex>> = OnceLock::new();
 
 pub fn get_playlist(username: &str) -> Result<(Option<String>, Option<String>)> {
     let username = username.to_lowercase();
@@ -37,7 +38,7 @@ pub fn get_playlist(username: &str) -> Result<(Option<String>, Option<String>)> 
     // get playlist of resolutions
     let playlist = util::get_retry(&playlist_url, 1, Some(&headers)).map_err(s!())?;
     let playlist_audio_url = if playlist.contains("audio") {
-        let re: &Arc<regex::Regex> = REGEX_ENCRY_TERM.get_or_init(|| regex::Regex::new(r#"audio_aac_128.*?URI="([^"]*)""#).unwrap().into());
+        let re: &Arc<regex::Regex> = REGEX_AUDIO_MATCH.get_or_init(|| regex::Regex::new(r#"audio_aac_128.*?URI="([^"]*)""#).unwrap().into());
         if let Some(captures) = re.captures(&playlist) {
             if let Some(match_) = captures.get(1) {
                 let audio_uri = match_.as_str();
@@ -47,7 +48,18 @@ pub fn get_playlist(username: &str) -> Result<(Option<String>, Option<String>)> 
                 None
             }
         } else {
-            None
+            let re: &Arc<regex::Regex> = REGEX_AUDIO_MATCH2.get_or_init(|| regex::Regex::new(r#"audio_aac_96.*?URI="([^"]*)""#).unwrap().into());
+            if let Some(captures) = re.captures(&playlist) {
+                if let Some(match_) = captures.get(1) {
+                    let audio_uri = match_.as_str();
+                    let audio_url = format!("{}{}", util::url_prefix(playlist_url, &audio_uri).ok_or_else(o!())?, audio_uri);
+                    Some(audio_url)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         }
     } else {
         None
