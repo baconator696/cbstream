@@ -161,7 +161,7 @@ pub fn url_prefix<'a>(url: &'a str, suffix: &str) -> Option<&'a str> {
     if suffix.contains("/") {
         let start_slashs = url.find("://")? + 3;
         let n = url.get(start_slashs..)?.find("/")?;
-        url.get(..n + start_slashs-1)
+        url.get(..n + start_slashs)
     } else {
         let n = url.rfind("/")?;
         url.get(..n)

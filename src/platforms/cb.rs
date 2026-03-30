@@ -42,7 +42,7 @@ pub fn get_playlist(username: &str) -> Result<(Option<String>, Option<String>)> 
         if let Some(captures) = re.captures(&playlist) {
             if let Some(match_) = captures.get(1) {
                 let audio_uri = match_.as_str();
-                let audio_url = format!("{}/{}", util::url_prefix(playlist_url, &audio_uri).ok_or_else(o!())?, audio_uri);
+                let audio_url = format!("{}{}", util::url_prefix(playlist_url, &audio_uri).ok_or_else(o!())?, audio_uri);
                 Some(audio_url)
             } else {
                 None
@@ -52,7 +52,7 @@ pub fn get_playlist(username: &str) -> Result<(Option<String>, Option<String>)> 
             if let Some(captures) = re.captures(&playlist) {
                 if let Some(match_) = captures.get(1) {
                     let audio_uri = match_.as_str();
-                    let audio_url = format!("{}/{}", util::url_prefix(playlist_url, &audio_uri).ok_or_else(o!())?, audio_uri);
+                    let audio_url = format!("{}{}", util::url_prefix(playlist_url, &audio_uri).ok_or_else(o!())?, audio_uri);
                     Some(audio_url)
                 } else {
                     None
@@ -68,7 +68,9 @@ pub fn get_playlist(username: &str) -> Result<(Option<String>, Option<String>)> 
         if line.len() < 5 || &line[..1] == "#" {
             continue;
         }
-        let playlist_url = Some(format!("{}/{}", util::url_prefix(playlist_url, line).ok_or_else(o!())?, line));
+        let space = if playlist_audio_url.is_some() {""} else {"/"};
+        let playlist_url = Some(format!("{}{}{}", util::url_prefix(playlist_url, line).ok_or_else(o!())?, space, line));
+        println!("{:?},{:?}",playlist_url,playlist_audio_url);
         return Ok((playlist_url, playlist_audio_url));
     }
     Ok((None, None))

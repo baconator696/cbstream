@@ -214,7 +214,7 @@ fn download(stream: Arc<RwLock<Stream>>) -> Result<()> {
     let data: Vec<u8> = match util::get_retry_vec(&stream.read().map_err(s!())?.url, 5, Some(&headers)).map_err(s!()) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("{}", e);
+            eprintln!("{}:{}", e, &stream.read().map_err(s!())?.url);
             return Ok(());
         }
     };
