@@ -5,7 +5,7 @@ use std::{
 };
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 static REGEX_GET: OnceLock<Arc<regex::Regex>> = OnceLock::new();
-pub fn get_playlist(username: &str) -> Result<Option<String>> {
+pub fn get_playlist(username: &str) -> Result<(Option<String>, Option<String>)> {
     let headers = util::create_headers(serde_json::json!({
         "user-agent": util::get_useragent().map_err(s!())?,
         "referer": format!("{}{}",Platform::SODA.referer(),username),
@@ -21,7 +21,7 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
     let json = &json["stream"];
     let hostname_array = json["edge_servers"].as_array().ok_or_else(o!())?;
     if hostname_array.len() == 0 {
-        return Ok(None);
+        return Ok((None, None));
     }
     let hostname = hostname_array[0].as_str().ok_or_else(o!())?;
     let stream_name = json["stream_name"].as_str().ok_or_else(o!())?;
@@ -36,9 +36,9 @@ pub fn get_playlist(username: &str) -> Result<Option<String>> {
         if line.len() < 5 || &line[..1] == "#" {
             continue;
         }
-        return Ok(Some(line.into()));
+        return Ok((Some(line.into()), None));
     }
-    Ok(None)
+    Ok((None, None))
 }
 static REGEX_PARSE: OnceLock<Arc<regex::Regex>> = OnceLock::new();
 pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Stream>> {
@@ -55,7 +55,11 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
                 if header_url_split.len() < 2 {
                     return Err("can not get mp4 header file".into());
                 }
-                let header_url = format!("{}/{}", playlist.url_prefix().ok_or_else(o!())?, header_url_split[1]);
+                let header_url = format!(
+                    "{}/{}",
+                    util::url_prefix(&playlist.playlist_url, header_url_split[1]).ok_or_else(o!())?,
+                    header_url_split[1]
+                );
                 let http_headers = util::create_headers(serde_json::json!({
                     "user-agent": util::get_useragent().map_err(s!())?,
                     "referer": Platform::SODA.referer(),
@@ -97,9 +101,11 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
         streams.push(stream::Stream::new(
             &filename,
             line.into(),
+            None,
             id,
             &filepath,
             playlist.mp4_header.clone(),
+            None,
             Platform::SODA,
         ));
     }

@@ -1,13 +1,13 @@
 
 ## cbstream - Work in Progress
 
-This is a work in progress tool for downloading streams from supported platforms. It currently supports **CB**, **SC**, **BONGA**, and **MFC**. For MKV output, ensure **ffmpeg** or **mkvtoolnix** is installed.
+This is a work in progress tool for downloading streams from supported platforms. It currently supports **CB**, **SC**, **BONGA**, and **MFC**. For MKV output, ensure **ffmpeg** is installed.
 
 ---
 
 ### Installation
 
-Before using the program, install **ffmpeg** or **mkvtoolnix** if you plan to output in MKV format. No other dependencies are required for basic functionality.
+Before using the program, install **ffmpeg** if you plan to output in MKV format. No other dependencies are required for basic functionality.
 
 ---
 

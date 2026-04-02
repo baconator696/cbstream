@@ -11,7 +11,7 @@ fn main() {
     const TAG: Option<&str> = option_env!("TAG");
     println!("cbstream {}", TAG.unwrap_or_default());
     let filename = "cb-config.json";
-    let mut models = config::load(filename).unwrap();
+    let mut models = config::json_loader(filename).unwrap();
     while !abort::get().unwrap() {
         models.download().unwrap();
         for _ in 0..300 {

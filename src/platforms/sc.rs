@@ -5,14 +5,14 @@ use std::{
 };
 type Result<T> = result::Result<T, Box<dyn error::Error>>;
 #[inline]
-pub fn get_playlist(username: &str) -> Result<Option<String>> {
+pub fn get_playlist(username: &str) -> Result<(Option<String>, Option<String>)> {
     sc_get_playlist(username, false)
 }
 #[inline]
 pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Stream>> {
     sc_parse_playlist(playlist, false)
 }
-pub fn sc_get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
+pub fn sc_get_playlist(username: &str, vr: bool) -> Result<(Option<String>, Option<String>)> {
     let platform = if vr { Platform::SCVR } else { Platform::SC };
     let headers = util::create_headers(serde_json::json!({
         "user-agent": util::get_useragent().map_err(s!())?,
@@ -40,7 +40,7 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
     //let playlist_url = format!("{}/hls/{}_vr/master/{}_vr_auto.m3u8", hls_prefix, model_id, model_id);
     let playlist = match util::get_retry(&playlist_url, 1, Some(&headers)).map_err(s!()) {
         Ok(r) => r,
-        Err(_) => return Ok(None),
+        Err(_) => return Ok((None, None)),
     };
     let mut playlist_url = None;
     for line in playlist.lines() {
@@ -64,7 +64,7 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<Option<String>> {
             }
         }
     }
-    return Ok(playlist_url);
+    return Ok((playlist_url, None));
 }
 
 static PSCH: phf::Map<&'static str, &'static str> = phf::phf_map! {
@@ -173,9 +173,11 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
         streams.push(stream::Stream::new(
             &filename,
             &url,
+            None,
             id,
             &filepath,
             playlist.mp4_header.clone(),
+            None,
             platform.clone(),
         ));
     }

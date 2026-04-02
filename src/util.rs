@@ -157,9 +157,15 @@ pub fn create_dir(dir: &Path) -> Result<()> {
     .map_err(e!())?;
     Ok(())
 }
-pub fn url_prefix(url: &str) -> Option<&str> {
-    let n = url.rfind("/")?;
-    url.get(..n)
+pub fn url_prefix<'a>(url: &'a str, suffix: &str) -> Option<&'a str> {
+    if suffix.contains("/") {
+        let start_slashs = url.find("://")? + 3;
+        let n = url.get(start_slashs..)?.find("/")?;
+        url.get(..n + start_slashs)
+    } else {
+        let n = url.rfind("/")?;
+        url.get(..n)
+    }
 }
 pub fn remove_non_num(url: &str) -> String {
     url.chars().filter(|c| c.is_ascii_digit()).collect::<String>()

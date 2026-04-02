@@ -44,7 +44,7 @@ impl Models {
     }
     /// updates Models struct with json
     pub fn update_config(&mut self) -> Result<()> {
-        let mut new_models = match load(&self.config_filepath) {
+        let mut new_models = match json_loader(&self.config_filepath) {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("{}", e);
@@ -70,7 +70,7 @@ impl Models {
     }
 }
 /// Initializes Models struct by loading it with model names from cb-config.json
-pub fn load(json_path: &str) -> Result<Models> {
+pub fn json_loader(json_path: &str) -> Result<Models> {
     let mut models = Models::new(json_path);
     let json = parse_json(json_path).map_err(s!())?;
     if let Some(platforms) = json["platform"].as_object() {
@@ -89,7 +89,7 @@ pub fn load(json_path: &str) -> Result<Models> {
             }
         }
     }
-    let mut useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
+    let mut useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0";
     if let Some(u) = json["config"]["user-agent"].as_str() {
         if u.len() != 0 {
             useragent = u;
