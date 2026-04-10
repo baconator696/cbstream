@@ -204,57 +204,66 @@ impl Stream {
     }
 }
 /// downloads the stream given the Stream's url
-fn download(stream: Arc<RwLock<Stream>>) -> Result<()> {
-    println!("{}_{}", stream.read().map_err(s!())?.filename, stream.read().map_err(s!())?.stream_id);
+fn download(stream_lock: Arc<RwLock<Stream>>) -> Result<()> {
+    // quick read to not lock stream
+    let stream = stream_lock.read().map_err(s!())?;
+    let filename = stream.filename.clone();
+    let stream_id = stream.filename.clone();
+    let referer = stream.platform.referer();
+    let url_video = stream.url.clone();
+    let url_audio = stream.url_audio.clone();
+    drop(stream);
+    println!("{}_{}", filename, stream_id);
     let headers = util::create_headers(serde_json::json!({
         "user-agent": util::get_useragent().map_err(s!())?,
-        "referer": stream.read().map_err(s!())?.platform.referer(),
+        "referer": referer,
     }))
     .map_err(s!())?;
-    let data: Vec<u8> = match util::get_retry_vec(&stream.read().map_err(s!())?.url, 5, Some(&headers)).map_err(s!()) {
+    let video_data: Vec<u8> = match util::get_retry_vec(&url_video, 5, Some(&headers)).map_err(s!()) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("{}:{}", e, &stream.read().map_err(s!())?.url);
+            eprintln!("{}:{}", e, &url_video);
             return Ok(());
         }
     };
-    let mut data_audio: Option<Vec<u8>> = None;
+    if video_data.len() < 10000 {
+        debug_eprintln!("{}", String::from_utf8_lossy(&video_data));
+        return Ok(());
+    }
+    let mut audio_data: Option<Vec<u8>> = None;
     // for seperate audio track
-    if let Some(url_audio) = &stream.read().map_err(s!())?.url_audio {
-        let data: Vec<u8> = match util::get_retry_vec(url_audio, 5, Some(&headers)).map_err(s!()) {
+    if let Some(url_audio) = &url_audio {
+        let audio_data_internal: Vec<u8> = match util::get_retry_vec(url_audio, 5, Some(&headers)).map_err(s!()) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("{}", e);
+                eprintln!("{}:{}", e, url_audio);
                 Vec::new()
             }
         };
-        if data.len() != 0 {
-            data_audio = Some(data);
+        if audio_data_internal.len() != 0 {
+            audio_data = Some(audio_data_internal);
         };
     };
-    if data.len() < 10000 {
-        debug_eprintln!("{}", String::from_utf8_lossy(&data));
-        return Ok(());
+    // early write lock to guarantee file deletion
+    let stream = &mut *stream_lock.write().map_err(s!())?;
+    let file = fs::File::create_new(&stream.stream_path).map_err(e!())?;
+    stream.file = Some(file);
+    let file = stream.file.as_mut().unwrap();
+    if let Some(header) = stream.file_header.as_ref() {
+        file.write_all(&header).map_err(e!())?;
     }
-    let mut file = fs::File::create_new(&stream.read().map_err(s!())?.stream_path).map_err(e!())?;
-    if let Some(header) = &stream.read().map_err(s!())?.file_header {
-        file.write_all(header).map_err(e!())?;
-    }
-    file.write_all(&data).map_err(e!())?;
+    file.write_all(&video_data).map_err(e!())?;
     file.seek(io::SeekFrom::Start(0)).map_err(e!())?;
-    let mut s = stream.write().map_err(s!())?;
-    s.file = Some(file);
-    drop(s);
     // for seperate audio track
-    if let Some(data_audio) = data_audio {
-        let mut file_audio = fs::File::create_new(&stream.read().map_err(s!())?.stream_path_audio).map_err(e!())?;
-        if let Some(header_audio) = &stream.read().map_err(s!())?.file_header_audio {
+    if let Some(data_audio) = audio_data {
+        let file_audio = fs::File::create_new(&stream.stream_path_audio).map_err(e!())?;
+        stream.file_audio = Some(file_audio);
+        let file_audio = stream.file_audio.as_mut().unwrap();
+        if let Some(header_audio) = &stream.file_header_audio {
             file_audio.write_all(header_audio).map_err(e!())?;
         }
         file_audio.write_all(&data_audio).map_err(e!())?;
         file_audio.seek(io::SeekFrom::Start(0)).map_err(e!())?;
-        let mut s = stream.write().map_err(s!())?;
-        s.file_audio = Some(file_audio);
     }
     Ok(())
 }
