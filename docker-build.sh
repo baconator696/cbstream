@@ -35,17 +35,20 @@ fi
 if [ "$1" = "linux/arm64" ]; then
     ## ARM64 BUILD
     dpkg --add-architecture arm64 &&
-        apt update &&
-        apt install -y gcc gcc-aarch64-linux-gnu pkg-config ffmpeg:arm64 &&
-        rustup target add aarch64-unknown-linux-gnu &&
-        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
-            cargo build -r --target aarch64-unknown-linux-gnu
+    apt update &&
+    apt install -y gcc gcc-aarch64-linux-gnu pkg-config ffmpeg:arm64 &&
+    rustup target add aarch64-unknown-linux-gnu &&
+    CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
+        cargo build -r --target aarch64-unknown-linux-gnu
 elif [ "$1" = "linux/amd64" ]; then
     ## AMD64 BUILD
     apt update &&
-        apt install -y gcc pkg-config ffmpeg &&
+    apt install -y gcc pkg-config ffmpeg &&
+    CFLAGS='-march=x86-64 -mtune=generic' \
+        CXXFLAGS='-march=x86-64 -mtune=generic' \
+        RUSTFLAGS='-C target-cpu=x86-64 -C target-feature=-avx,-avx2,-fma' \
         CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=gcc \
-            cargo build -r --target x86_64-unknown-linux-gnu
+        cargo build -r --target x86_64-unknown-linux-gnu
 else
     echo "Unsupported target platform: $1"
     exit 1
