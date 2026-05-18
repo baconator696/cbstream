@@ -87,7 +87,7 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
         if key.is_none() {
             if line.contains("#EXT-X-MOUFLON:PSCH") {
                 let segments: Vec<&str> = line.split(":").collect();
-                key = Some(PSCH[*(segments.get(3).ok_or_else(o!())?)])
+                key = Some(*PSCH.get(*(segments.get(3).ok_or_else(o!())?)).ok_or_else(o!())?)
             }
         }
         // parse MP4 header
