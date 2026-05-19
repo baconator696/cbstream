@@ -50,13 +50,16 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<(Option<String>, Opti
         playlist_url = Some(line.to_string());
     }
     if playlist.contains("EXT-X-MOUFLON") {
-        for line in playlist.lines().rev() {
+        for line in playlist.lines() {
             if !line.contains("EXT-X-MOUFLON") {
                 continue;
             }
             let segments: Vec<&str> = line.split(":").collect();
             let psch = segments.get(2).ok_or_else(o!())?;
             let pkey = segments.get(3).ok_or_else(o!())?;
+            if !PSCH.contains_key(*pkey) {
+                continue;
+            }
             if let Some(url) = playlist_url {
                 let playlist_url_append = format!("{}?&psch={}&pkey={}", url, psch, pkey);
                 playlist_url = Some(playlist_url_append);
@@ -70,6 +73,9 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<(Option<String>, Opti
 static PSCH: phf::Map<&'static str, &'static str> = phf::phf_map! {
     "Zokee2OhPh9kugh4" => "Quean4cai9boJa5a",
     "Ook7quaiNgiyuhai" => "EQueeGh2kaewa3ch",
+    "Zeechoej4aleeshi" => "ubahjae7goPoodi6",
+    "Fq6m2TO2ZeBkRPm9" => "xb6di1NF9EFXHUwb",
+    "GrRncsoByZmsiT6L" => "NigHYyOD9l4rvAEb",
 };
 
 static REGEX_ENCRY_TERM: OnceLock<Arc<regex::Regex>> = OnceLock::new();
