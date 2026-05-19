@@ -208,7 +208,7 @@ fn download(stream_lock: Arc<RwLock<Stream>>) -> Result<()> {
     // quick read to not lock stream
     let stream = stream_lock.read().map_err(s!())?;
     let filename = stream.filename.clone();
-    let stream_id = stream.filename.clone();
+    let stream_id = stream.stream_id.clone();
     let referer = stream.platform.referer();
     let url_video = stream.url.clone();
     let url_audio = stream.url_audio.clone();
