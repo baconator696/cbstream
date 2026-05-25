@@ -58,7 +58,7 @@ pub fn header_cast(e: Box<dyn Any + Send>) -> String {
 macro_rules! debug_eprintln {
     ($($arg:tt)*) => {
         if env::var("DEBUG").is_ok() {
-            println!($($arg)*);
+            eprintln!($($arg)*);
         }
     };
 }

@@ -73,7 +73,7 @@ pub struct Model {
     downloading: Arc<RwLock<bool>>,
     playlist_link: Option<String>,
     playlist_audio_link: Option<String>,
-    thread_handles: Vec<JoinHandle<()>>,
+    thread_handles: Vec<JoinHandle<prelude::v1::Result<(), String>>>,
     abort: Arc<RwLock<bool>>,
 }
 impl Model {
@@ -106,12 +106,15 @@ impl Model {
     fn is_downloading(&self) -> Result<bool> {
         Ok(*self.downloading.read().map_err(s!())?)
     }
-    fn join_handles(&mut self) {
+    fn join_handles_drop(&mut self) {
         let mut errors: Vec<String> = Vec::new();
         for handle in self.thread_handles.drain(..) {
             match handle.join().map_err(h!()) {
                 Err(e) => errors.push(e),
-                _ => (),
+                Ok(r) => match r.map_err(s!()) {
+                    Err(e) => errors.push(e),
+                    Ok(r) => r,
+                },
             };
         }
         for e in errors {
@@ -120,11 +123,18 @@ impl Model {
     }
     fn join_finished_handles(&mut self) -> Result<()> {
         let mut errors: Vec<String> = Vec::new();
-        for handle in self.thread_handles.drain(..).collect::<Vec<JoinHandle<()>>>() {
+        for handle in self
+            .thread_handles
+            .drain(..)
+            .collect::<Vec<JoinHandle<prelude::v1::Result<(), String>>>>()
+        {
             if handle.is_finished() {
                 match handle.join().map_err(h!()) {
                     Err(e) => errors.push(e),
-                    _ => (),
+                    Ok(r) => match r.map_err(s!()) {
+                        Err(e) => errors.push(e),
+                        Ok(r) => r,
+                    },
                 };
             } else {
                 self.thread_handles.push(handle);
@@ -161,7 +171,7 @@ impl Model {
         let handle = thread::spawn(move || {
             Playlist::new(platform, username, playlist_url, playlist_audio_url, abort, downloading, None, None)
                 .playlist()
-                .unwrap();
+                .map_err(s!())
         });
         self.thread_handles.push(handle);
         Ok(())
@@ -173,6 +183,6 @@ impl Model {
 }
 impl Drop for Model {
     fn drop(&mut self) {
-        self.join_handles()
+        self.join_handles_drop()
     }
 }

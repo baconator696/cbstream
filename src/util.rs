@@ -17,7 +17,6 @@ pub fn get_useragent() -> Result<String> {
     let u = USERAGENT.get().ok_or_else(o!())?;
     Ok((*u.read().map_err(s!())?).clone())
 }
-
 pub fn get_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String>>) -> Result<String> {
     let f = || {
         let client = reqwest::blocking::Client::new();
@@ -34,10 +33,13 @@ pub fn get_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String>
             client.get(url)
         };
         let resp = build.send().map_err(e!())?;
-        if resp.status() != 200 {
-            return Err(format!("{}-{}", resp.status(), resp.text().map_err(e!())?))?;
+        let status = resp.status();
+        let mut text = resp.text().map_err(e!())?;
+        if status != 200 {
+            text.truncate(100);
+            return Err(format!("{}-{}", status, text))?;
         }
-        Ok(resp.text().map_err(e!())?)
+        Ok(text)
     };
     let mut r = Err("".into());
     for _ in 0..retry {
@@ -65,8 +67,11 @@ pub fn get_retry_vec(url: &str, retry: i32, headers: Option<&HashMap<String, Str
             client.get(url)
         };
         let resp = build.send().map_err(e!())?;
-        if resp.status() != 200 {
-            return Err(format!("{}-{}", resp.status(), resp.text().map_err(e!())?))?;
+        let status = resp.status();
+        if status != 200 {
+            let mut text = resp.text().map_err(e!())?;
+            text.truncate(100);
+            return Err(format!("{}-{}", status, text))?;
         }
         Ok(resp.bytes().map_err(e!())?.to_vec())
     };
@@ -100,10 +105,13 @@ pub fn post_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String
             .header("content-type", content_type)
             .send()
             .map_err(e!())?;
-        if resp.status() != 200 {
-            return Err(format!("{}-{}", resp.status(), resp.text().map_err(e!())?))?;
+        let status = resp.status();
+        let mut text = resp.text().map_err(e!())?;
+        if status != 200 {
+            text.truncate(100);
+            return Err(format!("{}-{}", status, text))?;
         }
-        Ok(resp.text().map_err(e!())?)
+        Ok(text)
     };
     let mut r = Err("".into());
     for _ in 0..retry {
@@ -127,6 +135,16 @@ pub fn date() -> String {
     let now = chrono::Local::now();
     now.format("%y-%m-%d_%H-%M").to_string()
 }
+/// returns current hour and miniute appended together
+pub fn unique_time() -> Result<String> {
+    let sec_from_epoch = time::SystemTime::now()
+        .duration_since(time::SystemTime::UNIX_EPOCH)
+        .map_err(e!())?
+        .as_secs();
+    let seconds_in_today = sec_from_epoch % 86400;
+    let min_in_today = seconds_in_today / 60;
+    Ok(format!("{}{}", min_in_today / 60, min_in_today % 60))
+}
 /// returns temp directory location ex. "/tmp/cbstream/""
 pub fn temp_dir() -> Result<PathBuf> {
     let mut temp_dir = PathBuf::new();
@@ -136,14 +154,14 @@ pub fn temp_dir() -> Result<PathBuf> {
     } else {
         let t = match env::var("TEMP") {
             Ok(r) => r,
-            _ => format!("/tmp"),
+            _ => format!("/var/tmp"),
         };
         temp_dir.push(t);
     };
     temp_dir.push("cbstream");
     Ok(temp_dir)
 }
-pub fn create_dir(dir: &Path) -> Result<()> {
+pub fn create_dir(dir: impl AsRef<Path>) -> Result<()> {
     match fs::create_dir_all(dir) {
         Err(e) => {
             if e.kind() == io::ErrorKind::AlreadyExists {
@@ -169,4 +187,56 @@ pub fn url_prefix<'a>(url: &'a str, suffix: &str) -> Option<&'a str> {
 }
 pub fn remove_non_num(url: &str) -> String {
     url.chars().filter(|c| c.is_ascii_digit()).collect::<String>()
+}
+pub struct ManagedFile {
+    pub file: fs::File,
+    pub path: PathBuf,
+    pub final_path: PathBuf,
+}
+impl ManagedFile {
+    pub fn new(path: PathBuf, final_path: PathBuf) -> Result<Self> {
+        let file = fs::OpenOptions::new().create(true).append(true).open(&path).map_err(e!())?;
+        Ok(Self { file, path, final_path })
+    }
+    pub fn mv(&self, final_path: impl AsRef<Path>) -> Result<()> {
+        match fs::rename(&self.path, &final_path) {
+            Ok(_) => Ok(()),
+            Err(e) if e.kind() == io::ErrorKind::CrossesDevices => {
+                fs::copy(&self.path, &final_path)?;
+                Ok(())
+            }
+            Err(e) => Err(e).map_err(s!())?,
+        }
+    }
+    pub fn generate_filenames(username: &str, filename: &str, audio: bool) -> Result<Self> {
+        let temp_dir = temp_dir().map_err(s!())?;
+        let mut filepath = PathBuf::from(&temp_dir);
+        let mut final_filepath = PathBuf::from(username);
+        if !audio {
+            filepath.push(&filename);
+        } else {
+            filepath.push(format!("{}_audio", filename));
+        }
+        final_filepath.push(&filename);
+        let file = Self::new(filepath, final_filepath).map_err(s!())?;
+        Ok(file)
+    }
+}
+impl Drop for ManagedFile {
+    fn drop(&mut self) {
+        if self.path.exists() {
+            match fs::remove_file(&self.path).map_err(e!()) {
+                Err(e) => eprintln!("{}", e),
+                _ => (),
+            };
+        }
+    }
+}
+pub fn available_space_for_path(path: &PathBuf) -> Option<u64> {
+    let disks = sysinfo::Disks::new_with_refreshed_list_specifics(sysinfo::DiskRefreshKind::everything());
+    disks
+        .iter()
+        .filter(|d| path.starts_with(d.mount_point()))
+        .max_by_key(|d| d.mount_point().as_os_str().len())
+        .map(|d| d.available_space())
 }

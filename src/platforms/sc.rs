@@ -1,4 +1,4 @@
-use crate::{e, o, platforms::Platform, s, stream, util};
+use crate::{debug_eprintln, e, o, platforms::Platform, s, stream, util};
 use std::{
     sync::{Arc, OnceLock},
     *,
@@ -24,15 +24,16 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<(Option<String>, Opti
     let url = "https://stripchat.com/api/front/models?primaryTag=girls";
     let json_raw = util::get_retry(url, 5, Some(&headers)).map_err(s!())?;
     let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
-    let ref_hls = json["models"].as_array().ok_or_else(o!())?.get(0).ok_or_else(o!())?["hlsPlaylist"]
-        .as_str()
+    let ref_hls = json
+        .get("models")
+        .and_then(|o| o.as_array()?.get(0)?.get("hlsPlaylist")?.as_str())
         .ok_or_else(o!())?;
     let hls_prefix = ref_hls.split("/").collect::<Vec<&str>>().get(..3).ok_or_else(o!())?.join("/");
     // get model ID
     let url = format!("https://stripchat.com/api/front/v2/models/username/{}/cam", username);
     let json_raw = util::get_retry(&url, 5, Some(&headers)).map_err(s!())?;
     let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
-    let model_id = json["user"]["user"]["id"].as_i64().ok_or_else(o!())?;
+    let model_id = json.get("user").and_then(|o| o.get("user")?.get("id")?.as_i64()).ok_or_else(o!())?;
     // get largest HLS stream
     let vr = if vr { "_vr" } else { "" };
     let playlist_url = format!("{}/hls/{}{}/master/{}{}.m3u8", hls_prefix, model_id, vr, model_id, vr);
@@ -40,7 +41,10 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<(Option<String>, Opti
     //let playlist_url = format!("{}/hls/{}_vr/master/{}_vr_auto.m3u8", hls_prefix, model_id, model_id);
     let playlist = match util::get_retry(&playlist_url, 1, Some(&headers)).map_err(s!()) {
         Ok(r) => r,
-        Err(_) => return Ok((None, None)),
+        Err(e) => {
+            debug_eprintln!("{}", e);
+            return Ok((None, None));
+        }
     };
     let mut playlist_url = None;
     for line in playlist.lines() {
@@ -72,18 +76,17 @@ pub fn sc_get_playlist(username: &str, vr: bool) -> Result<(Option<String>, Opti
 
 static PSCH: phf::Map<&'static str, &'static str> = phf::phf_map! {
     "Zokee2OhPh9kugh4" => "Quean4cai9boJa5a",
-    "Ook7quaiNgiyuhai" => "EQueeGh2kaewa3ch",
     "Zeechoej4aleeshi" => "ubahjae7goPoodi6",
+    "Ook7quaiNgiyuhai" => "EQueeGh2kaewa3ch",
     "Fq6m2TO2ZeBkRPm9" => "xb6di1NF9EFXHUwb",
     "GrRncsoByZmsiT6L" => "NigHYyOD9l4rvAEb",
+    "1Dzcc6OjP73LKbtI" => "Y64UVwX5RrIWnOLp",
 };
 
 static REGEX_ENCRY_TERM: OnceLock<Arc<regex::Regex>> = OnceLock::new();
 
 pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Vec<stream::Stream>> {
     let platform = if vr { Platform::SCVR } else { Platform::SC };
-    let temp_dir = util::temp_dir().map_err(s!())?;
-    util::create_dir(&temp_dir).map_err(s!())?;
     let mut streams = Vec::new();
     let mut date: Option<String> = None;
     let mut key: Option<&str> = None;
@@ -121,7 +124,7 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
                 if line.len() < 21 {
                     return Err("error parsing date from playlist")?;
                 }
-                let t = (&line[n + 7..n + 21]).replace(":", "-").replace("T", "_");
+                let t = (&line.get(n + 7..n + 21).ok_or_else(o!())?).replace(":", "-").replace("T", "_");
                 date = Some(t);
             }
         }
@@ -174,18 +177,7 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Result<Ve
         let vr_str = if vr { "SCVR" } else { "SC" };
         let date = date.as_ref().ok_or_else(o!())?;
         let filename = format!("{}_{}_{}", vr_str, playlist.username, date);
-        let mut filepath = path::PathBuf::from(&temp_dir);
-        filepath.push(format!("{}-{}-{}-{}.mp4", vr_str.to_lowercase(), playlist.username, date, id));
-        streams.push(stream::Stream::new(
-            &filename,
-            &url,
-            None,
-            id,
-            &filepath,
-            playlist.mp4_header.clone(),
-            None,
-            platform.clone(),
-        ));
+        streams.push(stream::Stream::new(&filename, &url, None, id, platform.clone()));
     }
     Ok(streams)
 }

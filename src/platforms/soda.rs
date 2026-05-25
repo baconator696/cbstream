@@ -18,14 +18,14 @@ pub fn get_playlist(username: &str) -> Result<(Option<String>, Option<String>)> 
     let re: &Arc<regex::Regex> = REGEX_GET.get_or_init(|| regex::Regex::new(r#""stream":[^\}]+\}"#).unwrap().into());
     let json_string = re.find(&html).ok_or_else(o!())?.as_str();
     let json: serde_json::Value = serde_json::from_str(&format!("{{{}}}", json_string)).map_err(e!())?;
-    let json = &json["stream"];
-    let hostname_array = json["edge_servers"].as_array().ok_or_else(o!())?;
+    let json = json.get("stream").ok_or_else(o!())?;
+    let hostname_array = json.get("edge_servers").ok_or_else(o!())?.as_array().ok_or_else(o!())?;
     if hostname_array.len() == 0 {
         return Ok((None, None));
     }
     let hostname = hostname_array[0].as_str().ok_or_else(o!())?;
-    let stream_name = json["stream_name"].as_str().ok_or_else(o!())?;
-    let token = json["token"].as_str().ok_or_else(o!())?;
+    let stream_name = json.get("stream_name").ok_or_else(o!())?.as_str().ok_or_else(o!())?;
+    let token = json.get("token").ok_or_else(o!())?.as_str().ok_or_else(o!())?;
     let playlist_url = format!(
         "https://{}/{}_v1/index.ll.m3u8?multitrack=true&filter=tracks:v4v3v2v1a1a2&token={}",
         hostname, stream_name, token
@@ -42,8 +42,6 @@ pub fn get_playlist(username: &str) -> Result<(Option<String>, Option<String>)> 
 }
 static REGEX_PARSE: OnceLock<Arc<regex::Regex>> = OnceLock::new();
 pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Stream>> {
-    let temp_dir = util::temp_dir().map_err(s!())?;
-    util::create_dir(&temp_dir).map_err(s!())?;
     let mut streams = Vec::new();
     let mut date: Option<String> = None;
     for line in (playlist.playlist.as_ref()).ok_or_else(o!())?.lines() {
@@ -76,7 +74,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
                 if line.len() < 21 {
                     return Err("error parsing date from playlist")?;
                 }
-                let t = (&line[n + 7..n + 21]).replace(":", "-").replace("T", "_");
+                let t = (&line.get(n + 7..n + 21).ok_or_else(o!())?).replace(":", "-").replace("T", "_");
                 date = Some(t);
             }
         }
@@ -96,18 +94,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Result<Vec<stream::Str
         // parse filenames
         let date = date.as_ref().ok_or_else(o!())?;
         let filename = format!("CS_{}_{}", playlist.username, date);
-        let mut filepath = path::PathBuf::from(&temp_dir);
-        filepath.push(format!("cs-{}-{}-{}.mp4", playlist.username, date, id));
-        streams.push(stream::Stream::new(
-            &filename,
-            line.into(),
-            None,
-            id,
-            &filepath,
-            playlist.mp4_header.clone(),
-            None,
-            Platform::SODA,
-        ));
+        streams.push(stream::Stream::new(&filename, line.into(), None, id, Platform::SODA));
     }
     Ok(streams)
 }
