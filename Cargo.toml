@@ -5,15 +5,16 @@ edition = "2024"
 
 [dependencies]
 base64 = "0.22.1"
-chrono = "0.4.41"
+chrono = "0.4.44"
 phf = { version = "0.13.1", features = ["macros"] }
-regex = "1.11.1"
-reqwest = { version = "0.12.14", features = ["blocking", "http2", "rustls-tls","gzip"], default-features = false }
+regex = "1.12.3"
+reqwest = { version = "0.13.4", features = ["blocking", "gzip"] }
 scopeguard = "1.2.0"
-serde_json = "1.0.140"
-sha2 = "0.10.9"
-signal-hook = "0.3.17"
-sysinfo = { version = "0.35.1", features = ["linux-tmpfs"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+sha2 = "0.11.0"
+signal-hook = "0.4.4"
+sysinfo = { version = "0.39.2", features = ["linux-tmpfs"] }
 
 [target.'cfg(windows)'.dependencies]
-winreg = "0.10"
+winreg = "0.56.0"

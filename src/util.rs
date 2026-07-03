@@ -1,23 +1,14 @@
-use crate::{e, o, s};
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-    sync::{Arc, OnceLock, RwLock},
-    *,
+use {
+    crate::{e, o, s},
+    std::{
+        collections::HashMap,
+        path::{Path, PathBuf},
+        *,
+    },
 };
-type Result<T> = result::Result<T, Box<dyn error::Error>>;
+type Res<T> = Result<T, Box<dyn error::Error>>;
 
-static USERAGENT: OnceLock<Arc<RwLock<String>>> = OnceLock::new();
-pub fn set_useragent(useragent: String) -> Result<()> {
-    let u = USERAGENT.get_or_init(|| Arc::new(RwLock::new(String::new())));
-    *u.write().map_err(s!())? = useragent;
-    Ok(())
-}
-pub fn get_useragent() -> Result<String> {
-    let u = USERAGENT.get().ok_or_else(o!())?;
-    Ok((*u.read().map_err(s!())?).clone())
-}
-pub fn get_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String>>) -> Result<String> {
+pub fn get_retry(url: &str, trys: i32, headers: Option<&HashMap<String, String>>) -> Res<String> {
     let f = || {
         let client = reqwest::blocking::Client::new();
         let build = if let Some(headers) = headers {
@@ -26,7 +17,10 @@ pub fn get_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String>
             use reqwest::header::HeaderValue;
             use std::str::FromStr;
             for (k, v) in headers {
-                h.insert(HeaderName::from_str(&k).map_err(e!())?, HeaderValue::from_str(&v).map_err(e!())?);
+                h.insert(
+                    HeaderName::from_str(&k).map_err(e!())?,
+                    HeaderValue::from_str(&v).map_err(e!())?,
+                );
             }
             client.get(url).headers(h)
         } else {
@@ -42,7 +36,7 @@ pub fn get_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String>
         Ok(text)
     };
     let mut r = Err("".into());
-    for _ in 0..retry {
+    for _ in 0..trys {
         r = f();
         if r.is_ok() {
             break;
@@ -51,7 +45,11 @@ pub fn get_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String>
     }
     r
 }
-pub fn get_retry_vec(url: &str, retry: i32, headers: Option<&HashMap<String, String>>) -> Result<Vec<u8>> {
+pub fn get_retry_vec(
+    url: &str,
+    trys: i32,
+    headers: Option<&HashMap<String, String>>,
+) -> Res<Vec<u8>> {
     let f = |url| {
         let client = reqwest::blocking::Client::new();
         let build = if let Some(headers) = headers {
@@ -60,7 +58,10 @@ pub fn get_retry_vec(url: &str, retry: i32, headers: Option<&HashMap<String, Str
             use reqwest::header::HeaderValue;
             use std::str::FromStr;
             for (k, v) in headers {
-                h.insert(HeaderName::from_str(&k).map_err(e!())?, HeaderValue::from_str(&v).map_err(e!())?);
+                h.insert(
+                    HeaderName::from_str(&k).map_err(e!())?,
+                    HeaderValue::from_str(&v).map_err(e!())?,
+                );
             }
             client.get(url).headers(h)
         } else {
@@ -76,7 +77,7 @@ pub fn get_retry_vec(url: &str, retry: i32, headers: Option<&HashMap<String, Str
         Ok(resp.bytes().map_err(e!())?.to_vec())
     };
     let mut r = Err("".into());
-    for _ in 0..retry {
+    for _ in 0..trys {
         r = f(url);
         if r.is_ok() {
             break;
@@ -85,7 +86,13 @@ pub fn get_retry_vec(url: &str, retry: i32, headers: Option<&HashMap<String, Str
     }
     r
 }
-pub fn post_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String>>, payload: &str, content_type: &str) -> Result<String> {
+pub fn post_retry(
+    url: &str,
+    trys: i32,
+    headers: Option<&HashMap<String, String>>,
+    payload: &str,
+    content_type: &str,
+) -> Res<String> {
     let f = || {
         let client = reqwest::blocking::Client::new();
         let build = if let Some(headers) = headers {
@@ -94,7 +101,10 @@ pub fn post_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String
             use reqwest::header::HeaderValue;
             use std::str::FromStr;
             for (k, v) in headers {
-                h.insert(HeaderName::from_str(&k).map_err(e!())?, HeaderValue::from_str(&v).map_err(e!())?);
+                h.insert(
+                    HeaderName::from_str(&k).map_err(e!())?,
+                    HeaderValue::from_str(&v).map_err(e!())?,
+                );
             }
             client.post(url).headers(h)
         } else {
@@ -114,7 +124,7 @@ pub fn post_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String
         Ok(text)
     };
     let mut r = Err("".into());
-    for _ in 0..retry {
+    for _ in 0..trys {
         r = f();
         if r.is_ok() {
             break;
@@ -123,7 +133,7 @@ pub fn post_retry(url: &str, retry: i32, headers: Option<&HashMap<String, String
     }
     r
 }
-pub fn create_headers(json_map: serde_json::Value) -> Result<HashMap<String, String>> {
+pub fn create_headers(json_map: serde_json::Value) -> Res<HashMap<String, String>> {
     let mut headers: HashMap<String, String> = HashMap::new();
     for (k, v) in json_map.as_object().ok_or_else(o!())? {
         headers.insert(k.clone(), v.as_str().ok_or_else(o!())?.to_string());
@@ -136,7 +146,7 @@ pub fn date() -> String {
     now.format("%y-%m-%d_%H-%M").to_string()
 }
 /// returns current hour and miniute appended together
-pub fn unique_time() -> Result<String> {
+pub fn unique_time() -> Res<String> {
     let sec_from_epoch = time::SystemTime::now()
         .duration_since(time::SystemTime::UNIX_EPOCH)
         .map_err(e!())?
@@ -146,7 +156,7 @@ pub fn unique_time() -> Result<String> {
     Ok(format!("{}{}", min_in_today / 60, min_in_today % 60))
 }
 /// returns temp directory location ex. "/tmp/cbstream/""
-pub fn temp_dir() -> Result<PathBuf> {
+pub fn temp_dir() -> Res<PathBuf> {
     let mut temp_dir = PathBuf::new();
     if cfg!(target_os = "windows") {
         let t = env::var("TEMP").map_err(e!())?;
@@ -161,7 +171,7 @@ pub fn temp_dir() -> Result<PathBuf> {
     temp_dir.push("cbstream");
     Ok(temp_dir)
 }
-pub fn create_dir(dir: impl AsRef<Path>) -> Result<()> {
+pub fn create_dir(dir: impl AsRef<Path>) -> Res<()> {
     match fs::create_dir_all(dir) {
         Err(e) => {
             if e.kind() == io::ErrorKind::AlreadyExists {
@@ -186,19 +196,39 @@ pub fn url_prefix<'a>(url: &'a str, suffix: &str) -> Option<&'a str> {
     }
 }
 pub fn remove_non_num(url: &str) -> String {
-    url.chars().filter(|c| c.is_ascii_digit()).collect::<String>()
+    url.chars()
+        .filter(|c| c.is_ascii_digit())
+        .collect::<String>()
 }
 pub struct ManagedFile {
     pub file: fs::File,
     pub path: PathBuf,
     pub final_path: PathBuf,
 }
-impl ManagedFile {
-    pub fn new(path: PathBuf, final_path: PathBuf) -> Result<Self> {
-        let file = fs::OpenOptions::new().create(true).append(true).open(&path).map_err(e!())?;
-        Ok(Self { file, path, final_path })
+fn create_valid_path(path: &Path) -> Res<PathBuf> {
+    let mut path = path.to_path_buf();
+    if path.exists() {
+        let stem = path.file_stem().ok_or_else(o!())?.to_string_lossy();
+        let ext = path.extension().ok_or_else(o!())?.to_string_lossy();
+        path.set_file_name(format!("{}-.{}", stem, ext));
     }
-    pub fn mv(&self, final_path: impl AsRef<Path>) -> Result<()> {
+    Ok(path)
+}
+impl ManagedFile {
+    pub fn new(path: PathBuf, final_path: PathBuf) -> Res<Self> {
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .map_err(e!())?;
+        Ok(Self {
+            file,
+            path,
+            final_path,
+        })
+    }
+    pub fn mv(&self, final_path: &Path) -> Res<()> {
+        let final_path = create_valid_path(final_path).map_err(s!())?;
         match fs::rename(&self.path, &final_path) {
             Ok(_) => Ok(()),
             Err(e) if e.kind() == io::ErrorKind::CrossesDevices => {
@@ -208,7 +238,7 @@ impl ManagedFile {
             Err(e) => Err(e).map_err(s!())?,
         }
     }
-    pub fn generate_filenames(username: &str, filename: &str, audio: bool) -> Result<Self> {
+    pub fn generate_filenames(username: &str, filename: &str, audio: bool) -> Res<Self> {
         let temp_dir = temp_dir().map_err(s!())?;
         let mut filepath = PathBuf::from(&temp_dir);
         let mut final_filepath = PathBuf::from(username);
@@ -218,7 +248,11 @@ impl ManagedFile {
             filepath.push(format!("{}_audio", filename));
         }
         final_filepath.push(&filename);
-        let file = Self::new(filepath, final_filepath).map_err(s!())?;
+        let file = Self::new(
+            create_valid_path(&filepath).map_err(s!())?,
+            create_valid_path(&final_filepath).map_err(s!())?,
+        )
+        .map_err(s!())?;
         Ok(file)
     }
 }
@@ -233,7 +267,8 @@ impl Drop for ManagedFile {
     }
 }
 pub fn available_space_for_path(path: &PathBuf) -> Option<u64> {
-    let disks = sysinfo::Disks::new_with_refreshed_list_specifics(sysinfo::DiskRefreshKind::everything());
+    let disks =
+        sysinfo::Disks::new_with_refreshed_list_specifics(sysinfo::DiskRefreshKind::everything());
     disks
         .iter()
         .filter(|d| path.starts_with(d.mount_point()))

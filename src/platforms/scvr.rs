@@ -1,14 +1,20 @@
-use crate::{
-    platforms::sc,
-    stream::{Playlist, Stream},
+use {
+    crate::{
+        config::Settings,
+        platforms::sc,
+        stream::{Playlist, Stream},
+    },
+    std::{sync::Arc, *},
 };
-use std::*;
-type Result<T> = result::Result<T, Box<dyn error::Error>>;
+type Res<T> = Result<T, Box<dyn error::Error>>;
 #[inline]
-pub fn get_playlist(username: &str) -> Result<(Option<String>,Option<String>)> {
-    sc::sc_get_playlist(username, true)
+pub fn get_playlist(
+    username: &str,
+    settings: Arc<Settings>,
+) -> Res<(Option<String>, Option<String>)> {
+    sc::sc_get_playlist(username, true, settings)
 }
 #[inline]
-pub fn parse_playlist(playlist: &mut Playlist) -> Result<Vec<Stream>> {
+pub fn parse_playlist(playlist: &mut Playlist) -> Res<Vec<Stream>> {
     sc::sc_parse_playlist(playlist, true)
 }

@@ -1,13 +1,15 @@
-use crate::{
-    e, h, o,
-    platforms::Platform,
-    s,
-    util::{self, ManagedFile},
+use {
+    crate::{
+        e, h, o,
+        platforms::Platform,
+        s,
+        util::{self, ManagedFile},
+    },
+    std::{io::Read, process::ExitStatus, *},
 };
-use std::{io::Read, process::ExitStatus, *};
-type Result<T> = result::Result<T, Box<dyn error::Error>>;
-type Hresult<T> = result::Result<T, String>;
-fn ffmpeg_exists() -> Result<Option<&'static str>> {
+type Res<T> = Result<T, Box<dyn error::Error>>;
+type Hres<T> = Result<T, String>;
+fn ffmpeg_exists() -> Res<Option<&'static str>> {
     let path = "ffmpeg";
     match process::Command::new(path).arg("-version").output() {
         Ok(_) => Ok(Some(path)),
@@ -15,7 +17,12 @@ fn ffmpeg_exists() -> Result<Option<&'static str>> {
     }
 }
 /// muxes streams with ffmpeg pipe
-fn ffmpeg_seperate_v_a(ffmpeg_path: &str, file: &ManagedFile, file_audio: &Option<ManagedFile>, pf: &Platform) -> Result<()> {
+fn ffmpeg_seperate_v_a(
+    ffmpeg_path: &str,
+    file: &ManagedFile,
+    file_audio: &Option<ManagedFile>,
+    pf: &Platform,
+) -> Res<()> {
     let mut filepath = file.final_path.clone();
     filepath.set_extension("mkv");
     let mut container_type = match pf {
@@ -31,9 +38,17 @@ fn ffmpeg_seperate_v_a(ffmpeg_path: &str, file: &ManagedFile, file_audio: &Optio
     }
     // starts ffmpeg process
     let mut command = process::Command::new(ffmpeg_path);
-    command.arg("-f").arg(container_type).arg("-i").arg(&file.path);
+    command
+        .arg("-f")
+        .arg(container_type)
+        .arg("-i")
+        .arg(&file.path);
     if let Some(file_audio) = file_audio {
-        command.arg("-f").arg(container_type).arg("-i").arg(&file_audio.path);
+        command
+            .arg("-f")
+            .arg(container_type)
+            .arg("-i")
+            .arg(&file_audio.path);
     }
     let mut child = command
         .arg("-c")
@@ -50,18 +65,18 @@ fn ffmpeg_seperate_v_a(ffmpeg_path: &str, file: &ManagedFile, file_audio: &Optio
     // read from stderr/stdout pipes
     let mut stdout = child.stdout.take().ok_or_else(o!())?;
     let mut stderr = child.stderr.take().ok_or_else(o!())?;
-    let stdout_handle = thread::spawn(move || -> Hresult<String> {
+    let stdout_handle = thread::spawn(move || -> Hres<String> {
         let mut out = String::new();
         stdout.read_to_string(&mut out).map_err(e!())?;
         Ok(out)
     });
-    let stderr_handle = thread::spawn(move || -> Hresult<String> {
+    let stderr_handle = thread::spawn(move || -> Hres<String> {
         let mut out = String::new();
         stderr.read_to_string(&mut out).map_err(e!())?;
         Ok(out)
     });
     // monitors system memory
-    let kill_handle = thread::spawn(move || -> Hresult<ExitStatus> {
+    let kill_handle = thread::spawn(move || -> Hres<ExitStatus> {
         let mut sys = sysinfo::System::new_all();
         let exit_status = loop {
             match child.try_wait().map_err(e!())? {
@@ -91,7 +106,7 @@ fn ffmpeg_seperate_v_a(ffmpeg_path: &str, file: &ManagedFile, file_audio: &Optio
     return Ok(());
 }
 /// Main Muxing Function
-pub fn muxer(file: ManagedFile, file_audio: Option<ManagedFile>, pf: Platform) -> Result<()> {
+pub fn muxer(file: ManagedFile, file_audio: Option<ManagedFile>, pf: Platform) -> Res<()> {
     util::create_dir(file.final_path.parent().ok_or_else(o!())?).map_err(s!())?;
     if let Some(ffmpeg_path) = ffmpeg_exists().map_err(s!())? {
         match ffmpeg_seperate_v_a(ffmpeg_path, &file, &file_audio, &pf) {
@@ -103,7 +118,7 @@ pub fn muxer(file: ManagedFile, file_audio: Option<ManagedFile>, pf: Platform) -
     Ok(())
 }
 /// Fallback local muxer
-fn local_muxer(file: ManagedFile, file_audio: Option<ManagedFile>, pf: Platform) -> Result<()> {
+fn local_muxer(file: ManagedFile, file_audio: Option<ManagedFile>, pf: Platform) -> Res<()> {
     let mut extension = match pf {
         Platform::CB => "ts",
         Platform::MFC => "ts",

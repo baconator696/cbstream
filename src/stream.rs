@@ -1,15 +1,19 @@
-use crate::{
-    abort, debug_eprintln, e, h, muxer, o,
-    platforms::Platform,
-    s,
-    util::{self, ManagedFile},
+use {
+    crate::{
+        abort,
+        config::Settings,
+        debug_eprintln, e, h, muxer, o,
+        platforms::Platform,
+        s,
+        util::{self, ManagedFile},
+    },
+    std::{
+        io::{Seek, Write},
+        sync::{Arc, Mutex, RwLock, mpsc},
+        *,
+    },
 };
-use std::{
-    io::{Seek, Write},
-    sync::{Arc, Mutex, RwLock, mpsc},
-    *,
-};
-type Result<T> = result::Result<T, Box<dyn error::Error>>;
+type Res<T> = Result<T, Box<dyn error::Error>>;
 #[derive(Clone)]
 pub struct Playlist {
     pub platform: Platform,
@@ -25,6 +29,7 @@ pub struct Playlist {
     pub mp4_header: Option<Arc<Vec<u8>>>,
     /// optional - for audio/video split streams
     pub mp4_header_audio: Option<Arc<Vec<u8>>>,
+    pub settings: Arc<Settings>,
 }
 impl Playlist {
     pub fn new(
@@ -34,8 +39,7 @@ impl Playlist {
         playlist_audio_url: Option<String>,
         abort: Arc<RwLock<bool>>,
         downloading: Arc<RwLock<bool>>,
-        mp4_header: Option<Arc<Vec<u8>>>,
-        mp4_header_audio: Option<Arc<Vec<u8>>>,
+        settings: Arc<Settings>,
     ) -> Self {
         Playlist {
             platform,
@@ -47,14 +51,15 @@ impl Playlist {
             current_stream: None,
             abort,
             downloading,
-            mp4_header,
-            mp4_header_audio: mp4_header_audio,
+            mp4_header: None,
+            mp4_header_audio: None,
+            settings,
         }
     }
     /// updates downloaded playlist with url
-    fn update_playlist(&mut self) -> Result<()> {
+    fn update_playlist(&mut self) -> Res<()> {
         let headers = util::create_headers(serde_json::json!({
-            "user-agent": util::get_useragent().map_err(s!())?,
+            "user-agent": &self.settings.user_agent,
             "referer": self.platform.referer(),
 
         }))
@@ -62,23 +67,24 @@ impl Playlist {
         let playlist = util::get_retry(&self.playlist_url, 5, Some(&headers)).map_err(s!())?;
         self.playlist = Some(playlist);
         if let Some(playlist_audio_url) = &self.playlist_audio_url {
-            let playlist_audio = util::get_retry(playlist_audio_url, 5, Some(&headers)).map_err(s!())?;
+            let playlist_audio =
+                util::get_retry(playlist_audio_url, 5, Some(&headers)).map_err(s!())?;
             self.playlist_audio = Some(playlist_audio);
         }
         Ok(())
     }
-    fn abort_get(&self) -> Result<bool> {
+    fn abort_get(&self) -> Res<bool> {
         Ok(*self.abort.read().map_err(s!())?)
     }
     /// Main Playlist Loop
-    pub fn playlist(&mut self) -> Result<()> {
+    pub fn playlist(&mut self) -> Res<()> {
         let d = self.downloading.clone();
         scopeguard::defer! {
             if let Ok(mut downloading) = d.write() {
                 *downloading = false;
             }
         }
-        let mut mux_thread: Option<thread::JoinHandle<prelude::v1::Result<(), String>>> = None;
+        let mut mux_thread: Option<thread::JoinHandle<Result<(), String>>> = None;
         let mut trys = 0;
         while !self.abort_get().map_err(s!())? && !abort::get().map_err(s!())? {
             if let Some(mux_thread) = mux_thread.as_ref() {
@@ -145,53 +151,33 @@ impl Playlist {
             }
         }
     }
-    fn mux_streams(mut self) -> Result<()> {
+    fn mux_streams(mut self) -> Res<()> {
         let mux_id = util::unique_time().map_err(e!())?;
         let mut stream = self.current_stream.take().ok_or_else(o!())?;
         let temp_dir = util::temp_dir().map_err(s!())?;
         util::create_dir(&temp_dir).map_err(e!())?;
-        // generate files from current stream and initializes it with mp4 headers
+        // generate files from current stream and initializes it
+        let mut repeat = false;
         'outer: loop {
-            let (filename, contains_audio_bool) = {
+            let (mut filename, contains_audio_bool) = {
                 let stream_guard = stream.read().map_err(s!())?;
-                (stream_guard.filename.clone(), stream_guard.url_audio.is_some())
+                (
+                    stream_guard.filename.clone(),
+                    stream_guard.url_audio.is_some(),
+                )
             };
-            let filename = format!("{}_{}", filename, mux_id);
-            let mut file: ManagedFile = ManagedFile::generate_filenames(&self.username, &filename, false).map_err(s!())?;
+            if repeat {
+                filename = format!("{}_{}", filename, mux_id)
+            }
+            let mut file: ManagedFile =
+                ManagedFile::generate_filenames(&self.username, &filename, false).map_err(s!())?;
             let mut file_audio_option = if contains_audio_bool {
-                let file = ManagedFile::generate_filenames(&self.username, &filename, true).map_err(s!())?;
+                let file = ManagedFile::generate_filenames(&self.username, &filename, true)
+                    .map_err(s!())?;
                 Some(file)
             } else {
                 None
             };
-            // write optional mp4 headers
-            if let Some(mp4_header) = self.mp4_header.as_ref() {
-                let pos = file.file.stream_position().map_err(e!())?;
-                if let Err(e) = file.file.write_all(&mp4_header) {
-                    if e.kind() != io::ErrorKind::StorageFull {
-                        return Err(e).map_err(e!())?;
-                    }
-                    file.file.seek(io::SeekFrom::Start(pos)).map_err(e!())?;
-                    file.file.set_len(pos).map_err(e!())?;
-                    thread::sleep(time::Duration::from_secs(1));
-                    continue 'outer;
-                }
-            }
-            // write optional audio mp4 header
-            if let Some(file_audio) = file_audio_option.as_mut() {
-                if let Some(mp4_header_audio) = self.mp4_header_audio.as_ref() {
-                    let pos = file_audio.file.stream_position().map_err(e!())?;
-                    if let Err(e) = file_audio.file.write_all(&mp4_header_audio) {
-                        if e.kind() != io::ErrorKind::StorageFull {
-                            return Err(e).map_err(e!())?;
-                        }
-                        file_audio.file.seek(io::SeekFrom::Start(pos)).map_err(e!())?;
-                        file.file.set_len(pos).map_err(e!())?;
-                        thread::sleep(time::Duration::from_secs(1));
-                        continue 'outer;
-                    }
-                }
-            }
             // determine if there is some space left in temp directory
             if let Some(available) = util::available_space_for_path(&file.path) {
                 if available < 1 << 27 {
@@ -227,7 +213,10 @@ impl Playlist {
                             if e.kind() != io::ErrorKind::StorageFull {
                                 Err(e).map_err(e!())?
                             }
-                            file_audio.file.seek(io::SeekFrom::Start(pos)).map_err(e!())?;
+                            file_audio
+                                .file
+                                .seek(io::SeekFrom::Start(pos))
+                                .map_err(e!())?;
                             file.file.set_len(pos).map_err(e!())?;
                             break 'inner;
                         }
@@ -236,7 +225,10 @@ impl Playlist {
                 // gets next stream and quit if done
                 let next_stream_yield = stream.read().map_err(s!())?.next_stream_yield_rx.clone();
                 if let Some(next_stream_yield) = next_stream_yield {
-                    let _ = next_stream_yield.lock().map_err(s!())?.recv_timeout(time::Duration::from_mins(1));
+                    let _ = next_stream_yield
+                        .lock()
+                        .map_err(s!())?
+                        .recv_timeout(time::Duration::from_mins(1));
                 }
                 let next_stream = match stream.write().map_err(s!())?.next_stream.take() {
                     Some(o) => o,
@@ -244,6 +236,7 @@ impl Playlist {
                 };
                 stream = next_stream;
             }
+            repeat = true;
             // disables audio if it failed to download
             if let Some(file_audio) = file_audio_option.as_ref() {
                 if file_audio.path.metadata().map_err(e!())?.len() == 0 {
@@ -254,7 +247,9 @@ impl Playlist {
             if file.path.metadata().map_err(e!())?.len() != 0 {
                 muxer::muxer(file, file_audio_option, self.platform.clone()).map_err(s!())?;
             }
-            if stream.read().map_err(s!())?.next_stream.is_none() && !*self.downloading.read().map_err(s!())? {
+            if stream.read().map_err(s!())?.next_stream.is_none()
+                && !*self.downloading.read().map_err(s!())?
+            {
                 break 'outer;
             }
         }
@@ -269,15 +264,27 @@ pub struct Stream {
     index: u32,
     data: Option<Arc<Vec<u8>>>,
     data_audio: Option<Arc<Vec<u8>>>,
+    pub mp4_header: Option<Arc<Vec<u8>>>,
+    pub mp4_header_audio: Option<Arc<Vec<u8>>>,
     pub next_stream: Option<Arc<RwLock<Stream>>>,
     platform: Platform,
+    user_agent: String,
     muxer_yield_tx: mpsc::Sender<()>,
     muxer_yield_rx: Option<Arc<Mutex<mpsc::Receiver<()>>>>,
     next_stream_yield_tx: mpsc::Sender<()>,
     next_stream_yield_rx: Option<Arc<Mutex<mpsc::Receiver<()>>>>,
 }
 impl Stream {
-    pub fn new(filename: &str, url: &str, url_audio: Option<&str>, id: u32, platform: Platform) -> Self {
+    pub fn new(
+        filename: &str,
+        url: &str,
+        url_audio: Option<&str>,
+        id: u32,
+        platform: Platform,
+        user_agent: String,
+        mp4_header: Option<Arc<Vec<u8>>>,
+        mp4_header_audio: Option<Arc<Vec<u8>>>,
+    ) -> Self {
         let url_audio = if url_audio.is_none() {
             None
         } else {
@@ -297,8 +304,11 @@ impl Stream {
             index: 0,
             data: None,
             data_audio: None,
+            mp4_header,
+            mp4_header_audio,
             next_stream: None,
             platform,
+            user_agent,
             muxer_yield_tx,
             muxer_yield_rx,
             next_stream_yield_tx,
@@ -307,7 +317,7 @@ impl Stream {
     }
 }
 /// downloads the stream given the Stream's url
-fn download(stream_lock: Arc<RwLock<Stream>>) -> Result<()> {
+fn download(stream_lock: Arc<RwLock<Stream>>) -> Res<()> {
     let stream_defer = stream_lock.clone();
     scopeguard::defer! {
         if let Ok(mut stream) = stream_defer.write().map_err(s!()) {
@@ -322,38 +332,55 @@ fn download(stream_lock: Arc<RwLock<Stream>>) -> Result<()> {
     let referer = stream.platform.referer();
     let url_video = stream.url.clone();
     let url_audio = stream.url_audio.clone();
+    let user_agent = stream.user_agent.clone();
+    let mp4_header = stream.mp4_header.clone();
+    let mp4_header_audio = stream.mp4_header_audio.clone();
     drop(stream);
     println!("{}_{}", filename, stream_id);
     let headers = util::create_headers(serde_json::json!({
-        "user-agent": util::get_useragent().map_err(s!())?,
+        "user-agent": user_agent,
         "referer": referer,
     }))
     .map_err(s!())?;
-    let video_data: Vec<u8> = match util::get_retry_vec(&url_video, 5, Some(&headers)).map_err(s!()) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("{}:{}", e, &url_video);
-            return Ok(());
-        }
-    };
+    let mut video_data: Vec<u8> =
+        match util::get_retry_vec(&url_video, 5, Some(&headers)).map_err(s!()) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("{}:{}", e, &url_video);
+                return Ok(());
+            }
+        };
     if video_data.len() < 10000 {
         debug_eprintln!("{}", String::from_utf8_lossy(&video_data));
         return Ok(());
     }
+    if let Some(mp4_header) = mp4_header {
+        let mut video_combined = (*mp4_header).clone();
+        video_combined.append(&mut video_data);
+        video_data = video_combined;
+    }
     let mut audio_data: Option<Arc<Vec<u8>>> = None;
-    // for seperate audio track
-    if let Some(url_audio) = &url_audio {
-        let audio_data_internal: Vec<u8> = match util::get_retry_vec(url_audio, 5, Some(&headers)).map_err(s!()) {
-            Ok(r) => r,
-            Err(e) => {
-                eprintln!("{}:{}", e, url_audio);
-                Vec::new()
+    'audio: {
+        if let Some(url_audio) = &url_audio {
+            let mut audio_data_internal: Vec<u8> =
+                match util::get_retry_vec(url_audio, 5, Some(&headers)).map_err(s!()) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        eprintln!("{}:{}", e, url_audio);
+                        Vec::new()
+                    }
+                };
+            if audio_data_internal.len() == 0 {
+                break 'audio;
+            };
+            if let Some(mp4_header_audio) = mp4_header_audio {
+                let mut audio_combined = (*mp4_header_audio).clone();
+                audio_combined.append(&mut audio_data_internal);
+                audio_data_internal = audio_combined;
             }
-        };
-        if audio_data_internal.len() != 0 {
             audio_data = Some(Arc::new(audio_data_internal));
-        };
-    };
+        }
+    }
     let stream = &mut *stream_lock.write().map_err(s!())?;
     stream.data = Some(Arc::new(video_data));
     stream.data_audio = audio_data;

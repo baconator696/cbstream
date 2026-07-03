@@ -1,15 +1,17 @@
-use crate::s;
-use std::{
-    sync::{Arc, OnceLock, RwLock, atomic},
-    *,
+use {
+    crate::s,
+    std::{
+        sync::{Arc, OnceLock, RwLock, atomic},
+        *,
+    },
 };
-type Result<T> = result::Result<T, Box<dyn error::Error>>;
+type Res<T> = Result<T, Box<dyn error::Error>>;
 static ABORT: OnceLock<Arc<RwLock<bool>>> = OnceLock::new();
-pub fn get() -> Result<bool> {
+pub fn get() -> Res<bool> {
     let a = ABORT.get_or_init(|| init_internal().unwrap());
     return Ok(*a.read().map_err(s!())?);
 }
-fn init_internal() -> Result<Arc<RwLock<bool>>> {
+fn init_internal() -> Res<Arc<RwLock<bool>>> {
     let abort = Arc::new(RwLock::new(false));
     let a = abort.clone();
     thread::spawn(move || {
