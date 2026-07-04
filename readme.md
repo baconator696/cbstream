@@ -1,13 +1,13 @@
+## cbstream
 
-## cbstream - Work in Progress
+This is a tool for recording live streams from adult entertainment platforms. It monitors streamers you add and automatically downloads their broadcasts when they go live. It currently supports **CB** (Chaturbate), **SC** (StripChat), **SCVR** (StripChat VR), **BONGA** (BongaCams), and **MFC** (MyFreeCams).
 
-This is a work in progress tool for downloading streams from supported platforms. It currently supports **CB**, **SC**, **BONGA**, and **MFC**. For MKV output, ensure **ffmpeg** is installed.
 
 ---
 
 ### Installation
 
-Before using the program, install **ffmpeg** if you plan to output in MKV format. No other dependencies are required for basic functionality.
+Install **ffmpeg** if you plan to output in MKV format. No other dependencies are required for basic functionality.
 
 ---
 
@@ -19,7 +19,9 @@ This is a command line program, to run the program using terminal in Windows:
 .\cbstream.exe
 ```
 
-After execution, a JSON configuration file will be saved in the working directory. Add model names to this file to start downloading their streams. The program actively monitors the JSON file, so no restart is needed when adding or removing models.
+You can optionally pass the path to the configuration file as the first argument. If omitted, the program uses `cb-config.json` in the working directory.
+
+After execution, a JSON configuration file will be saved where set. Add model names to this file to start downloading their streams. The program actively monitors the JSON file, so no restart is needed when adding or removing models.
 
 ---
 
@@ -30,11 +32,11 @@ The configuration file follows this structure:
 ```json
 {
   "platform": {
-      "CB": ["model1","model2"],
-      "MFC": ["model3"],
+      "CB": ["model1", "model2"],
+      "SC": ["model4"],
       "SCVR": [],
-      "SC": [],
       "BONGA": [],
+      "MFC": ["model3"]
   },
   "config": {
       "user-agent": ""
@@ -42,13 +44,17 @@ The configuration file follows this structure:
 }
 ```
 
-- **CB**, **SC**, **MFC**, **SCVR**, **BONGA**: Supported platforms. Add model names to the respective lists.
+- **CB** (Chaturbate), **SC** (StripChat), **SCVR** (StripChat VR), **BONGA** (BongaCams), **MFC** (MyFreeCams): Supported platforms. Add model names to the respective lists.
+
+Downloaded streams are saved in the working directory inside folders named after each model.
 
 ---
 
 ### Environment Variables
 
-An optional environment variable `TEMP` can be set to specify where temporary streams are saved. If not set, temporary files will be stored in the OS's default temp folder.
+An optional environment variable `TEMP` can be set to specify where temporary streams are saved (Linux default: `/var/tmp`).
+
+An optional environment variable `CONFIG` can be set to specify a custom path for the configuration file (overrided by the CLI argument).
 
 ---
 
@@ -61,10 +67,9 @@ docker run --name cbstream -v <save location>:/cbstream --stop-timeout 300 -itd 
     docker logs -f cbstream
 ```
 
-- Replace `<save location>` with the directory on your host machine where you want to store downloaded files.
+- Replace `<save location>` with the directory on your host machine where you want to store downloaded files and the config file.
+- FFmpeg is bundled into the Docker image.
 - The `--stop-timeout 300` flag ensures the container has 300 seconds to shut down gracefully.
-- The `-itd` flags run the container in interactive, TTY, and detached mode.
-- The JSON configuration file will be saved in the mounted directory (`/cbstream`).
 
 ---
 
