@@ -31,7 +31,7 @@ pub fn init(filepath: &Path) -> Res<Config> {
         Err(e) => {
             if e.kind() == io::ErrorKind::NotFound {
                 println!(
-                    "configuration file created at {}\nplease fill with relatvent data",
+                    "configuration file created at {}\nplease fill with relevant data",
                     filepath.display()
                 );
                 let config = Config::default(filepath);
