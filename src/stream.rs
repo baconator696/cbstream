@@ -93,7 +93,7 @@ impl Playlist {
                 }
             }
             if let Err(state) = self.update_playlist().map_err(s!()) {
-                debug_eprintln!("{}", state);
+                debug_eprintln!("{:?}:{}:{}",self.platform,self.username, state);
                 break;
             }
             trys += 1;
