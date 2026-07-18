@@ -1,11 +1,11 @@
 pub mod bonga;
+pub mod c4;
 pub mod cb;
 pub mod f4f;
 pub mod mfc;
 pub mod sc;
 pub mod scvr;
 pub mod soda;
-
 use {
     crate::{
         config::Settings,
@@ -28,11 +28,12 @@ pub enum Platform {
     BONGA,
     SODA,
     F4F,
+    C4,
 }
 impl Platform {
     pub fn list() -> Vec<Platform> {
         use Platform::*;
-        vec![CB, SC, SCVR, MFC, BONGA, SODA, F4F]
+        vec![CB, SC, SCVR, MFC, BONGA, SODA, F4F, C4]
     }
     pub fn new(key: &str) -> Option<Self> {
         use Platform::*;
@@ -44,6 +45,7 @@ impl Platform {
             "BONGA" => Some(BONGA),
             "SODA" => Some(SODA),
             "F4F" => Some(F4F),
+            "C4" => Some(C4),
             _ => None,
         }
     }
@@ -57,6 +59,7 @@ impl Platform {
             BONGA => bonga::parse_playlist,
             SODA => soda::parse_playlist,
             F4F => f4f::parse_playlist,
+            C4 => c4::parse_playlist,
         }
     }
     fn get_playlist(&self) -> fn(&str, Arc<Settings>) -> Res<(Option<String>, Option<String>)> {
@@ -69,6 +72,7 @@ impl Platform {
             BONGA => bonga::get_playlist,
             SODA => soda::get_playlist,
             F4F => f4f::get_playlist,
+            C4 => c4::get_playlist,
         }
     }
     pub fn referer(&self) -> &'static str {
@@ -81,6 +85,7 @@ impl Platform {
             BONGA => "https://bongacams.com/",
             SODA => "https://www.camsoda.com/",
             F4F => "https://www.flirt4free.com/",
+            C4 => "https://www.cam4.com/",
         }
     }
 }
