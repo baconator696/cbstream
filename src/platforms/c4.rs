@@ -1,5 +1,5 @@
 use {
-    crate::{config::Settings, e, o, platforms::Platform, s, stream, util},
+    crate::{config::Settings, debug_eprintln, e, o, platforms::Platform, s, stream, util},
     std::{sync::Arc, *},
 };
 type Res<T> = Result<T, Box<dyn error::Error>>;
@@ -18,7 +18,13 @@ pub fn get_playlist(
         "https://www.cam4.com/rest/v1.0/profile/{}/streamInfo",
         username
     );
-    let json_raw = util::get_retry(&url, 1, Some(&headers)).map_err(s!())?;
+    let json_raw = match util::get_retry(&url, 1, Some(&headers)).map_err(s!()) {
+        Ok(r) => r,
+        Err(e) => {
+            debug_eprintln!("{}", e);
+            return Ok((None, None));
+        }
+    };
     let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
     let main_playlist_url = json
         .get("cdnURL")

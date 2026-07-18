@@ -91,20 +91,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream
         return combine_playlist_audio_video(playlist);
     }
     let mut streams = Vec::new();
-    let mut date: Option<String> = None;
     for line in (playlist.playlist.as_ref()).ok_or_else(o!())?.lines() {
-        // parse date and time
-        if date.is_none() {
-            if let Some(n) = line.find("TIME") {
-                if line.len() < 21 {
-                    return Err("error parsing date from playlist")?;
-                }
-                let t = (&line.get(n + 7..n + 21).ok_or_else(o!())?)
-                    .replace(":", "-")
-                    .replace("T", "_");
-                date = Some(t);
-            }
-        }
         if line.len() == 0 || &line[..1] == "#" {
             continue;
         }
@@ -118,7 +105,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream
         let n = id.find(".").ok_or_else(o!())?;
         let id = (&id[..n]).trim().parse::<u32>().map_err(e!())?;
         // parse filenames
-        let date = date.as_ref().ok_or_else(o!())?;
+        let date = util::date();
         let filename = format!("CB_{}_{}", playlist.username, date);
         streams.push(stream::Stream::new(
             &filename,
@@ -167,7 +154,6 @@ fn parse_playlist_audio_video(
     playlist: &mut stream::Playlist,
     audio: bool,
 ) -> Res<HashMap<u32, Info>> {
-    let mut date: Option<String> = None;
     let mut streams: HashMap<u32, Info> = HashMap::new();
     let playlist_text = if audio {
         playlist.playlist_audio.as_ref().ok_or_else(o!())?
@@ -209,18 +195,6 @@ fn parse_playlist_audio_video(
                 *playlist_mp4_header = Some(sync::Arc::new(header))
             }
         }
-        // parse date and time
-        if date.is_none() {
-            if let Some(n) = line.find("TIME") {
-                if line.len() < 21 {
-                    return Err("error parsing date from playlist")?;
-                }
-                let t = (&line.get(n + 7..n + 21).ok_or_else(o!())?)
-                    .replace(":", "-")
-                    .replace("T", "_");
-                date = Some(t);
-            }
-        }
         if line.len() == 0 || &line[..1] == "#" {
             continue;
         }
@@ -239,7 +213,7 @@ fn parse_playlist_audio_video(
         let id2 = id.get(2).ok_or_else(o!())?;
         let id = id2.trim().parse::<u32>().map_err(e!())?;
         // parse filenames
-        let date = date.as_ref().ok_or_else(o!())?;
+        let date = util::date();
         let filename = format!("CB_{}_{}", playlist.username, date);
         let stream = Info {
             url: full_url,

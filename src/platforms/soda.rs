@@ -62,7 +62,6 @@ pub fn get_playlist(
 static REGEX_PARSE: OnceLock<Arc<regex::Regex>> = OnceLock::new();
 pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream>> {
     let mut streams = Vec::new();
-    let mut date: Option<String> = None;
     for line in (playlist.playlist.as_ref()).ok_or_else(o!())?.lines() {
         // parse MP4 header
         if playlist.mp4_header.is_none() {
@@ -89,18 +88,6 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream
                 playlist.mp4_header = Some(sync::Arc::new(header))
             }
         }
-        // parse date and time
-        if date.is_none() {
-            if let Some(n) = line.find("TIME") {
-                if line.len() < 21 {
-                    return Err("error parsing date from playlist")?;
-                }
-                let t = (&line.get(n + 7..n + 21).ok_or_else(o!())?)
-                    .replace(":", "-")
-                    .replace("T", "_");
-                date = Some(t);
-            }
-        }
         if line.len() == 0 || &line[..1] == "#" {
             continue;
         }
@@ -115,7 +102,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream
             .parse::<u32>()
             .map_err(e!())?;
         // parse filenames
-        let date = date.as_ref().ok_or_else(o!())?;
+        let date = util::date();
         let filename = format!("CS_{}_{}", playlist.username, date);
         streams.push(stream::Stream::new(
             &filename,

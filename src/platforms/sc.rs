@@ -107,7 +107,6 @@ pub fn sc_get_playlist(
 pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Res<Vec<stream::Stream>> {
     let platform = if vr { Platform::SCVR } else { Platform::SC };
     let mut streams = Vec::new();
-    let mut date: Option<String> = None;
     let mut key: Option<String> = None;
     let enumerated_lines: Vec<(usize, &str)> = playlist
         .playlist
@@ -149,18 +148,6 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Res<Vec<s
                 playlist.mp4_header = Some(sync::Arc::new(header))
             }
         }
-        // parse date and time from playlist
-        if date.is_none() {
-            if let Some(n) = line.find("TIME") {
-                if line.len() < 21 {
-                    return Err("error parsing date from playlist")?;
-                }
-                let t = (&line.get(n + 7..n + 21).ok_or_else(o!())?)
-                    .replace(":", "-")
-                    .replace("T", "_");
-                date = Some(t);
-            }
-        }
         if line.len() == 0 || &line[..1] == "#" {
             continue;
         }
@@ -177,7 +164,7 @@ pub fn sc_parse_playlist(playlist: &mut stream::Playlist, vr: bool) -> Res<Vec<s
         let id = id[..n].trim().parse::<u32>().map_err(e!())?;
         // parse filename
         let vr_str = if vr { "SCVR" } else { "SC" };
-        let date = date.as_ref().ok_or_else(o!())?;
+        let date = util::date();
         let filename = format!("{}_{}_{}", vr_str, playlist.username, date);
         streams.push(stream::Stream::new(
             &filename,
