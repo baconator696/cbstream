@@ -1,5 +1,6 @@
 pub mod bonga;
 pub mod cb;
+pub mod f4f;
 pub mod mfc;
 pub mod sc;
 pub mod scvr;
@@ -26,11 +27,12 @@ pub enum Platform {
     MFC,
     BONGA,
     SODA,
+    F4F,
 }
 impl Platform {
     pub fn list() -> Vec<Platform> {
         use Platform::*;
-        vec![CB, SC, SCVR, MFC, BONGA, SODA]
+        vec![CB, SC, SCVR, MFC, BONGA, SODA, F4F]
     }
     pub fn new(key: &str) -> Option<Self> {
         use Platform::*;
@@ -41,6 +43,7 @@ impl Platform {
             "SCVR" => Some(SCVR),
             "BONGA" => Some(BONGA),
             "SODA" => Some(SODA),
+            "F4F" => Some(F4F),
             _ => None,
         }
     }
@@ -53,6 +56,7 @@ impl Platform {
             SCVR => scvr::parse_playlist,
             BONGA => bonga::parse_playlist,
             SODA => soda::parse_playlist,
+            F4F => f4f::parse_playlist,
         }
     }
     fn get_playlist(&self) -> fn(&str, Arc<Settings>) -> Res<(Option<String>, Option<String>)> {
@@ -64,6 +68,7 @@ impl Platform {
             SCVR => scvr::get_playlist,
             BONGA => bonga::get_playlist,
             SODA => soda::get_playlist,
+            F4F => f4f::get_playlist,
         }
     }
     pub fn referer(&self) -> &'static str {
@@ -75,6 +80,7 @@ impl Platform {
             SCVR => "https://vr.stripchat.com/",
             BONGA => "https://bongacams.com/",
             SODA => "https://www.camsoda.com/",
+            F4F => "https://www.flirt4free.com/",
         }
     }
 }

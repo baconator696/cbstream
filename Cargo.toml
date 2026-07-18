@@ -15,6 +15,7 @@ serde_json = "1.0.150"
 sha2 = "0.11.0"
 signal-hook = "0.4.4"
 sysinfo = { version = "0.39.2", features = ["linux-tmpfs"] }
+tungstenite = { version = "0.30.0", features = ["rustls-tls-native-roots"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56.0"

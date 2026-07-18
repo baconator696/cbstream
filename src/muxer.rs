@@ -32,6 +32,7 @@ fn ffmpeg_seperate_v_a(
         Platform::SCVR => "mp4",
         Platform::BONGA => "mpegts",
         Platform::SODA => "mp4",
+        Platform::F4F => "mpegts",
     };
     if file_audio.is_some() {
         container_type = "mp4";
@@ -126,6 +127,7 @@ fn local_muxer(file: ManagedFile, file_audio: Option<ManagedFile>, pf: Platform)
         Platform::SCVR => "mp4",
         Platform::BONGA => "ts",
         Platform::SODA => "mp4",
+        Platform::F4F => "ts",
     };
     if file_audio.is_some() {
         extension = "mp4";

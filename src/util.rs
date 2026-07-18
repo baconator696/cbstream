@@ -142,7 +142,7 @@ pub fn create_headers(json_map: serde_json::Value) -> Res<HashMap<String, String
 }
 /// returns current date and time in "24-02-29_23-12" format
 pub fn date() -> String {
-    let now = chrono::Local::now();
+    let now = chrono::Utc::now();
     now.format("%y-%m-%d_%H-%M").to_string()
 }
 /// returns current hour and miniute appended together
