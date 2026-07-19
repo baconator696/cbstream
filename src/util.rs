@@ -207,7 +207,7 @@ pub struct ManagedFile {
 }
 fn create_valid_path(path: &Path) -> Res<PathBuf> {
     let mut path = path.to_path_buf();
-    if path.exists() {
+    while path.exists() {
         let stem = path.file_stem().ok_or_else(o!())?.to_string_lossy();
         let ext = path.extension().ok_or_else(o!())?.to_string_lossy();
         path.set_file_name(format!("{}-.{}", stem, ext));

@@ -93,7 +93,7 @@ impl Playlist {
                 }
             }
             if let Err(state) = self.update_playlist().map_err(s!()) {
-                debug_eprintln!("{:?}:{}:{}",self.platform,self.username, state);
+                debug_eprintln!("{:?}:{}:{}", self.platform, self.username, state);
                 break;
             }
             trys += 1;
@@ -224,15 +224,33 @@ impl Playlist {
                 }
                 // gets next stream and quit if done
                 let next_stream_yield = stream.read().map_err(s!())?.next_stream_yield_rx.clone();
-                if let Some(next_stream_yield) = next_stream_yield {
-                    let _ = next_stream_yield
-                        .lock()
-                        .map_err(s!())?
-                        .recv_timeout(time::Duration::from_mins(1));
+                loop {
+                    if let Some(next_stream_yield) = next_stream_yield.clone() {
+                        if next_stream_yield
+                            .lock()
+                            .map_err(s!())?
+                            .recv_timeout(time::Duration::from_secs(1))
+                            .is_ok()
+                        {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                    if stream.read().map_err(s!())?.next_stream.is_none() {
+                        if !*self.downloading.read().map_err(s!())? {
+                            break 'inner;
+                        }
+                    } else {
+                        break;
+                    }
                 }
                 let next_stream = match stream.write().map_err(s!())?.next_stream.take() {
                     Some(o) => o,
-                    None => break 'inner,
+                    None => {
+                        *self.downloading.write().map_err(s!())? = false;
+                        break 'inner;
+                    }
                 };
                 stream = next_stream;
             }
