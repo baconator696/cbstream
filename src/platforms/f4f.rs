@@ -17,23 +17,23 @@ pub fn get_playlist(
     let url = "https://www.flirt4free.com/?tpl=index2&model=json";
     let mut json_raw = util::get_retry(&url, 1, Some(&headers)).map_err(s!())?;
     // parse json
-    let json_start = json_raw.find("{").ok_or_else(o!())?;
-    let mut json_end = 0;
-    while let Some(bracket_pos) = json_raw.get(json_end..).and_then(|s| s.find("}")) {
-        json_end = json_end + 1 + bracket_pos
+    let json_start = json_raw.find("'models':").ok_or_else(o!())? + 10;
+    let json_end = json_raw.find("'favorites':").ok_or_else(o!())?;
+    let mut offset = 0;
+    while let Some(bracket_pos) = json_raw
+        .get(json_start + offset..json_end)
+        .and_then(|s| s.find("}"))
+    {
+        offset = 1 + bracket_pos + offset;
     }
     json_raw = json_raw
-        .get(json_start..json_end)
+        .get(json_start..json_start + offset)
         .ok_or_else(o!())?
-        .replace("'", "\"")
-        .replace(" ", "")
-        .replace("\n", "")
-        .replace("\\\\", "\\")
-        .replace(",]", "]")
-        .replace(",}", "}");
+        .to_string();
+    json_raw.push(']');
     let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
     // determine if model is online
-    let online_models_value_option = json.get("models").and_then(|m| m.as_array()).and_then(|m| {
+    let online_models_value_option = json.as_array().and_then(|m| {
         m.iter().find_map(|model_value| {
             model_value
                 .get("model_seo_name")
