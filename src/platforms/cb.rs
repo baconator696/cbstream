@@ -87,39 +87,40 @@ pub fn get_playlist(
 }
 // parse legacy playlist
 pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream>> {
-    if playlist.playlist_audio_url.is_some() {
-        return combine_playlist_audio_video(playlist);
-    }
-    let mut streams = Vec::new();
-    for line in (playlist.playlist.as_ref()).ok_or_else(o!())?.lines() {
-        if line.len() == 0 || &line[..1] == "#" {
-            continue;
-        }
-        let full_url = format!(
-            "{}/{}",
-            util::url_prefix(&playlist.playlist_url, false).ok_or_else(o!())?,
-            line
-        );
-        // parse stream id
-        let id = line.split("_").last().ok_or_else(o!())?;
-        let n = id.find(".").ok_or_else(o!())?;
-        let id = (&id[..n]).trim().parse::<u32>().map_err(e!())?;
-        // parse filenames
-        let date = util::date();
-        let filename = format!("CB_{}_{}", playlist.username, date);
-        streams.push(stream::Stream::new(
-            &filename,
-            &full_url,
-            None,
-            id,
-            Platform::CB,
-            playlist.settings.user_agent.clone(),
-            None,
-            None,
-        ));
-    }
-
-    Ok(streams)
+    //if playlist.playlist_audio_url.is_some() {
+    return combine_playlist_audio_video(playlist);
+    //}
+    //// legacy ts streams, disabling before removal
+    //let mut streams = Vec::new();
+    //for line in (playlist.playlist.as_ref()).ok_or_else(o!())?.lines() {
+    //    if line.len() == 0 || &line[..1] == "#" {
+    //        continue;
+    //    }
+    //    let full_url = format!(
+    //        "{}/{}",
+    //        util::url_prefix(&playlist.playlist_url, false).ok_or_else(o!())?,
+    //        line
+    //    );
+    //    // parse stream id
+    //    let id = line.split("_").last().ok_or_else(o!())?;
+    //    let n = id.find(".").ok_or_else(o!())?;
+    //    let id = (&id[..n]).trim().parse::<u32>().map_err(e!())?;
+    //    // parse filenames
+    //    let date = util::date();
+    //    let filename = format!("CB_{}_{}", playlist.username, date);
+    //    streams.push(stream::Stream::new(
+    //        &filename,
+    //        &full_url,
+    //        None,
+    //        id,
+    //        Platform::CB,
+    //        playlist.settings.user_agent.clone(),
+    //        None,
+    //        None,
+    //    ));
+    //}
+    //
+    //Ok(streams)
 }
 fn combine_playlist_audio_video(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream>> {
     let mut streams = Vec::new();

@@ -25,8 +25,8 @@ fn ffmpeg_seperate_v_a(
 ) -> Res<()> {
     let mut filepath = file.final_path.clone();
     filepath.set_extension("mkv");
-    let mut container_type = match pf {
-        Platform::CB => "mpegts",
+    let container_type = match pf {
+        Platform::CB => "mp4",
         Platform::MFC => "mpegts",
         Platform::SC => "mp4",
         Platform::SCVR => "mp4",
@@ -35,9 +35,6 @@ fn ffmpeg_seperate_v_a(
         Platform::F4F => "mpegts",
         Platform::C4 => "mpegts",
     };
-    if file_audio.is_some() {
-        container_type = "mp4";
-    }
     // starts ffmpeg process
     let mut command = process::Command::new(ffmpeg_path);
     command
@@ -121,8 +118,8 @@ pub fn muxer(file: ManagedFile, file_audio: Option<ManagedFile>, pf: Platform) -
 }
 /// Fallback local muxer
 fn local_muxer(file: ManagedFile, file_audio: Option<ManagedFile>, pf: Platform) -> Res<()> {
-    let mut extension = match pf {
-        Platform::CB => "ts",
+    let extension = match pf {
+        Platform::CB => "mp4",
         Platform::MFC => "ts",
         Platform::SC => "mp4",
         Platform::SCVR => "mp4",
@@ -131,9 +128,6 @@ fn local_muxer(file: ManagedFile, file_audio: Option<ManagedFile>, pf: Platform)
         Platform::F4F => "ts",
         Platform::C4 => "ts",
     };
-    if file_audio.is_some() {
-        extension = "mp4";
-    }
     let mut filepath = file.final_path.clone();
     filepath.set_extension(extension);
     file.mv(&filepath).map_err(s!())?;
