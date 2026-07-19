@@ -73,7 +73,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream
                 }
                 let header_url = format!(
                     "{}/{}",
-                    util::url_prefix(&playlist.playlist_url, header_url_split[1])
+                    util::url_prefix(&playlist.playlist_url, true)
                         .ok_or_else(o!())?,
                     header_url_split[1]
                 );

@@ -1,6 +1,6 @@
 use {
     crate::{config::Settings, debug_eprintln, e, o, platforms::Platform, s, stream, util},
-    std::{sync::Arc, *},
+    std::{collections::HashMap, sync::Arc, *},
 };
 type Res<T> = Result<T, Box<dyn error::Error>>;
 pub fn get_playlist(
@@ -13,31 +13,80 @@ pub fn get_playlist(
 
     }))
     .map_err(s!())?;
-    // get model id
+    let ret = match main_playlist(username, Some(&headers)).map_err(s!()) {
+        Ok(r) => r,
+        Err(e) => {
+            debug_eprintln!("{}", e);
+            alt_playlist(username, Some(&headers)).map_err(s!())?
+        }
+    };
+    return Ok(ret);
+}
+fn main_playlist(
+    username: &str,
+    headers: Option<&HashMap<String, String>>,
+) -> Res<(Option<String>, Option<String>)> {
     let url = format!(
         "https://www.cam4.com/rest/v1.0/profile/{}/streamInfo",
         username
     );
-    let json_raw = match util::get_retry(&url, 1, Some(&headers)).map_err(s!()) {
-        Ok(r) => r,
-        Err(e) => {
-            debug_eprintln!("{}", e);
-            return Ok((None, None));
-        }
-    };
+    let json_raw = util::get_retry(&url, 1, headers).map_err(s!())?;
     let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
     let main_playlist_url = json
         .get("cdnURL")
         .and_then(|v| v.as_str())
         .ok_or_else(o!())?;
-    let main_playlist = util::get_retry(main_playlist_url, 1, Some(&headers)).map_err(s!())?;
+    let main_playlist = util::get_retry(main_playlist_url, 1, headers).map_err(s!())?;
     for line in main_playlist.lines() {
         if line.len() < 5 || &line[..1] == "#" {
             continue;
         }
         let playlist_link = format!(
             "{}/{}",
-            util::url_prefix(&main_playlist_url, line).ok_or_else(o!())?,
+            util::url_prefix(&main_playlist_url, true).ok_or_else(o!())?,
+            line
+        );
+        return Ok((Some(playlist_link), None));
+    }
+    return Ok((None, None));
+}
+fn alt_playlist(
+    username: &str,
+    headers: Option<&HashMap<String, String>>,
+) -> Res<(Option<String>, Option<String>)> {
+    let url = format!(
+        "https://api.cam4.com/webchat/requestAccess?roomname={}&chat_history_limit=0",
+        username
+    );
+    let json_raw = util::get_retry(&url, 1, headers).map_err(s!())?;
+    let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
+    let main_playlist_url = match json
+        .get("output")
+        .and_then(|v| v.as_array())
+        .and_then(|vec| {
+            vec.iter().find_map(|val| {
+                val.get("protocol")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| (s == "HLS").then_some(val))
+            })
+        })
+        .and_then(|v| v.get("uri"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(o!()) {
+            Ok(r) => r,
+            Err(e) => {
+                debug_eprintln!("{}",e);
+                return Ok((None, None)); 
+            },
+        };
+    let main_playlist = util::get_retry(main_playlist_url, 1, headers).map_err(s!())?;
+    for line in main_playlist.lines() {
+        if line.len() < 5 || &line[..1] == "#" {
+            continue;
+        }
+        let playlist_link = format!(
+            "{}/{}",
+            util::url_prefix(&main_playlist_url, true).ok_or_else(o!())?,
             line
         );
         return Ok((Some(playlist_link), None));
@@ -57,14 +106,19 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream
             .find(".ts")
             .and_then(|n| line.get(..n))
             .and_then(|s| s.split("_").last())
-            .and_then(|s| s.parse::<u32>().ok())
+            .and_then(|s| s.parse::<u64>().ok())
             .ok_or_else(o!())?;
+        let id = if playlist.playlist.as_ref().unwrap().contains("SERVER") {
+            id as u32
+        } else {
+            (id / 1000) as u32
+        };
         //parse filenames
         let date = util::date();
         let filename = format!("C4_{}_{}", playlist.username, date);
         let url = format!(
             "{}/{}",
-            util::url_prefix(&playlist.playlist_url, line).ok_or_else(o!())?,
+            util::url_prefix(&playlist.playlist_url, true).ok_or_else(o!())?,
             line
         );
         streams.push(stream::Stream::new(

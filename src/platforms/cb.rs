@@ -58,7 +58,7 @@ pub fn get_playlist(
             .captures(&playlist)
             .and_then(|c| Some(c.get(1)?.as_str()))
         {
-            let prefix = util::url_prefix(playlist_url, audio_uri).ok_or_else(o!())?;
+            let prefix = util::url_prefix(playlist_url, false).ok_or_else(o!())?;
             Some(format!("{}{}", prefix, audio_uri))
         } else {
             None
@@ -77,7 +77,7 @@ pub fn get_playlist(
         };
         let playlist_url = Some(format!(
             "{}{}{}",
-            util::url_prefix(playlist_url, line).ok_or_else(o!())?,
+            util::url_prefix(playlist_url, false).ok_or_else(o!())?,
             space,
             line
         ));
@@ -97,7 +97,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream
         }
         let full_url = format!(
             "{}/{}",
-            util::url_prefix(&playlist.playlist_url, line).ok_or_else(o!())?,
+            util::url_prefix(&playlist.playlist_url, false).ok_or_else(o!())?,
             line
         );
         // parse stream id
@@ -181,7 +181,7 @@ fn parse_playlist_audio_video(
                 }
                 let header_url = format!(
                     "{}{}",
-                    util::url_prefix(playlist_url, header_url_split[1]).ok_or_else(o!())?,
+                    util::url_prefix(playlist_url, false).ok_or_else(o!())?,
                     header_url_split[1]
                 );
                 let http_headers = util::create_headers(serde_json::json!({
@@ -200,7 +200,7 @@ fn parse_playlist_audio_video(
         }
         let full_url = format!(
             "{}{}",
-            util::url_prefix(&playlist.playlist_url, line).ok_or_else(o!())?,
+            util::url_prefix(&playlist.playlist_url, false).ok_or_else(o!())?,
             line
         );
         // parse stream id

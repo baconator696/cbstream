@@ -67,7 +67,7 @@ pub fn get_playlist(
         }
         let playlist_link = format!(
             "{}/{}",
-            util::url_prefix(&playlist_url, line).ok_or_else(o!())?,
+            util::url_prefix(&playlist_url, true).ok_or_else(o!())?,
             line
         );
         return Ok((Some(playlist_link), None));
@@ -83,7 +83,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream
         // parse relevant information
         let url = format!(
             "{}/{}",
-            util::url_prefix(&playlist.playlist_url, line).ok_or_else(o!())?,
+            util::url_prefix(&playlist.playlist_url, true).ok_or_else(o!())?,
             line
         );
         // parse stream id

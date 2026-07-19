@@ -185,8 +185,8 @@ pub fn create_dir(dir: impl AsRef<Path>) -> Res<()> {
     .map_err(e!())?;
     Ok(())
 }
-pub fn url_prefix<'a>(url: &'a str, suffix: &str) -> Option<&'a str> {
-    if suffix.contains("/") {
+pub fn url_prefix<'a>(url: &'a str, end: bool) -> Option<&'a str> {
+    if !end {
         let start_slashs = url.find("://")? + 3;
         let n = url.get(start_slashs..)?.find("/")?;
         url.get(..n + start_slashs)

@@ -1,5 +1,5 @@
 use {
-    crate::{config::Settings, debug_eprintln, e, o, platforms::Platform, s, stream, util},
+    crate::{config::Settings, e, o, platforms::Platform, s, stream, util},
     std::{sync::Arc, *},
 };
 type Res<T> = Result<T, Box<dyn error::Error>>;
@@ -28,15 +28,10 @@ pub fn get_playlist(
         .replace("'", "\"")
         .replace(" ", "")
         .replace("\n", "")
+        .replace("\\\\", "\\")
         .replace(",]", "]")
         .replace(",}", "}");
-    let json: serde_json::Value = match serde_json::from_str(&json_raw).map_err(e!()) {
-        Ok(r) => r,
-        Err(e) => {
-            debug_eprintln!("{}", e);
-            return Ok((None, None));
-        }
-    };
+    let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
     // determine if model is online
     let online_models_value_option = json.get("models").and_then(|m| m.as_array()).and_then(|m| {
         m.iter().find_map(|model_value| {
@@ -116,7 +111,7 @@ pub fn get_playlist(
         }
         let playlist_link = format!(
             "{}/{}",
-            util::url_prefix(&main_playlist_url, line).ok_or_else(o!())?,
+            util::url_prefix(&main_playlist_url, true).ok_or_else(o!())?,
             line
         );
         return Ok((Some(playlist_link), None));
