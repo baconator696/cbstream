@@ -25,7 +25,7 @@ pub fn get_playlist(
         "method=getRoomData&args%5B%5D={}&args%5B%5D=&args%5B%5D=",
         username
     );
-    let json_raw = util::post_retry(
+    let mut json_raw = util::post_retry(
         &url,
         1,
         Some(&headers),
@@ -33,7 +33,16 @@ pub fn get_playlist(
         "application/x-www-form-urlencoded; charset=UTF-8",
     )
     .map_err(s!())?;
-    let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
+    let json: serde_json::Value = match serde_json::from_str(&json_raw).map_err(e!()) {
+        Ok(r) => r,
+        Err(e) => {
+            if !env::var("DEBUG").is_ok() {
+                json_raw.truncate(100);
+            }
+            let err = format!("{}: {}", e, json_raw);
+            return Err(err)?;
+        }
+    };
     let hls = match json
         .get("localData")
         .ok_or_else(o!())?

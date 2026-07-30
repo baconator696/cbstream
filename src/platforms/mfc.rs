@@ -17,8 +17,17 @@ pub fn get_playlist(
         "https://api-edge.myfreecams.com/usernameLookup/{}",
         username
     );
-    let json_raw = util::get_retry(&url, 5, Some(&headers)).map_err(s!())?;
-    let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
+    let mut json_raw = util::get_retry(&url, 5, Some(&headers)).map_err(s!())?;
+    let json: serde_json::Value = match serde_json::from_str(&json_raw).map_err(e!()) {
+        Ok(r) => r,
+        Err(e) => {
+            if !env::var("DEBUG").is_ok() {
+                json_raw.truncate(100);
+            }
+            let err = format!("{}: {}", e, json_raw);
+            return Err(err)?;
+        }
+    };
     let user = json
         .get("result")
         .ok_or_else(o!())?

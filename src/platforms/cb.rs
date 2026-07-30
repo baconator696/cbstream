@@ -23,7 +23,7 @@ pub fn get_playlist(
     .map_err(s!())?;
     // get model playlist link
     let url = format!("https://chaturbate.com/api/chatvideocontext/{}/", username);
-    let json_raw = match util::get_retry(&url, 1, Some(&headers)) {
+    let mut json_raw = match util::get_retry(&url, 1, Some(&headers)) {
         Ok(r) => Ok::<String, Box<dyn error::Error>>(r),
         Err(e) => {
             if e.to_string().contains("Unauthorized") {
@@ -37,7 +37,16 @@ pub fn get_playlist(
         }
     }
     .map_err(s!())?;
-    let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
+    let json: serde_json::Value = match serde_json::from_str(&json_raw).map_err(e!()) {
+        Ok(r) => r,
+        Err(e) => {
+            if !env::var("DEBUG").is_ok() {
+                json_raw.truncate(100);
+            }
+            let err = format!("{}: {}", e, json_raw);
+            return Err(err)?;
+        }
+    };
     let playlist_url = json
         .get("hls_source")
         .ok_or_else(o!())?

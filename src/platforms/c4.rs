@@ -30,8 +30,17 @@ fn main_playlist(
         "https://www.cam4.com/rest/v1.0/profile/{}/streamInfo",
         username
     );
-    let json_raw = util::get_retry(&url, 1, headers).map_err(s!())?;
-    let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
+    let mut json_raw = util::get_retry(&url, 1, headers).map_err(s!())?;
+    let json: serde_json::Value = match serde_json::from_str(&json_raw).map_err(e!()) {
+        Ok(r) => r,
+        Err(e) => {
+            if !env::var("DEBUG").is_ok() {
+                json_raw.truncate(100);
+            }
+            let err = format!("{}: {}", e, json_raw);
+            return Err(err)?;
+        }
+    };
     let main_playlist_url = json
         .get("cdnURL")
         .and_then(|v| v.as_str())
@@ -58,8 +67,17 @@ fn alt_playlist(
         "https://api.cam4.com/webchat/requestAccess?roomname={}&chat_history_limit=0",
         username
     );
-    let json_raw = util::get_retry(&url, 1, headers).map_err(s!())?;
-    let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
+    let mut json_raw = util::get_retry(&url, 1, headers).map_err(s!())?;
+    let json: serde_json::Value = match serde_json::from_str(&json_raw).map_err(e!()) {
+        Ok(r) => r,
+        Err(e) => {
+            if !env::var("DEBUG").is_ok() {
+                json_raw.truncate(100);
+            }
+            let err = format!("{}: {}", e, json_raw);
+            return Err(err)?;
+        }
+    };
     let main_playlist_url = match json
         .get("output")
         .and_then(|v| v.as_array())
@@ -72,13 +90,14 @@ fn alt_playlist(
         })
         .and_then(|v| v.get("uri"))
         .and_then(|v| v.as_str())
-        .ok_or_else(o!()) {
-            Ok(r) => r,
-            Err(e) => {
-                debug_eprintln!("{}",e);
-                return Ok((None, None)); 
-            },
-        };
+        .ok_or_else(o!())
+    {
+        Ok(r) => r,
+        Err(e) => {
+            debug_eprintln!("{}", e);
+            return Ok((None, None));
+        }
+    };
     let main_playlist = util::get_retry(main_playlist_url, 1, headers).map_err(s!())?;
     for line in main_playlist.lines() {
         if line.len() < 5 || &line[..1] == "#" {

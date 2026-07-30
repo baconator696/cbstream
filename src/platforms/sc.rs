@@ -38,8 +38,17 @@ pub fn sc_get_playlist(
     .map_err(s!())?;
     // get hls url prefix
     let url = "https://stripchat.com/api/front/models?primaryTag=girls";
-    let json_raw = util::get_retry(url, 5, Some(&headers)).map_err(s!())?;
-    let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
+    let mut json_raw = util::get_retry(url, 5, Some(&headers)).map_err(s!())?;
+    let json: serde_json::Value = match serde_json::from_str(&json_raw).map_err(e!()) {
+        Ok(r) => r,
+        Err(e) => {
+            if !env::var("DEBUG").is_ok() {
+                json_raw.truncate(100);
+            }
+            let err = format!("{}: {}", e, json_raw);
+            return Err(err)?;
+        }
+    };
     let ref_hls = json
         .get("models")
         .and_then(|o| o.as_array()?.get(0)?.get("hlsPlaylist")?.as_str())
@@ -55,8 +64,17 @@ pub fn sc_get_playlist(
         "https://stripchat.com/api/front/v2/models/username/{}/cam",
         username
     );
-    let json_raw = util::get_retry(&url, 5, Some(&headers)).map_err(s!())?;
-    let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
+    let mut json_raw = util::get_retry(&url, 5, Some(&headers)).map_err(s!())?;
+    let json: serde_json::Value = match serde_json::from_str(&json_raw).map_err(e!()) {
+        Ok(r) => r,
+        Err(e) => {
+            if !env::var("DEBUG").is_ok() {
+                json_raw.truncate(100);
+            }
+            let err = format!("{}: {}", e, json_raw);
+            return Err(err)?;
+        }
+    };
     let model_id = json
         .get("user")
         .and_then(|o| o.get("user")?.get("id")?.as_i64())

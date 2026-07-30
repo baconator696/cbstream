@@ -24,7 +24,17 @@ pub fn get_playlist(
         REGEX_GET.get_or_init(|| regex::Regex::new(r#""stream":[^\}]+\}"#).unwrap().into());
     let json_string = re.find(&html).ok_or_else(o!())?.as_str();
     let json: serde_json::Value =
-        serde_json::from_str(&format!("{{{}}}", json_string)).map_err(e!())?;
+        match serde_json::from_str(&format!("{{{}}}", json_string)).map_err(e!()) {
+            Ok(r) => r,
+            Err(e) => {
+                let mut json_raw = json_string.to_string();
+                if !env::var("DEBUG").is_ok() {
+                    json_raw.truncate(100);
+                }
+                let err = format!("{}: {}", e, json_raw);
+                return Err(err)?;
+            }
+        };
     let json = json.get("stream").ok_or_else(o!())?;
     let hostname_array = json
         .get("edge_servers")
@@ -73,8 +83,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream
                 }
                 let header_url = format!(
                     "{}/{}",
-                    util::url_prefix(&playlist.playlist_url, true)
-                        .ok_or_else(o!())?,
+                    util::url_prefix(&playlist.playlist_url, true).ok_or_else(o!())?,
                     header_url_split[1]
                 );
                 let http_headers = util::create_headers(serde_json::json!({
