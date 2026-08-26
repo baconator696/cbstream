@@ -24,6 +24,7 @@ pub fn get_playlist(
 pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream>> {
     sc_parse_playlist(playlist, false)
 }
+static REGEX_HTML_PARSE: OnceLock<Arc<regex::Regex>> = OnceLock::new();
 pub fn sc_get_playlist(
     username: &str,
     vr: bool,
@@ -33,52 +34,47 @@ pub fn sc_get_playlist(
     let headers = util::create_headers(serde_json::json!({
         "user-agent": &settings.user_agent,
         "referer": format!("{}{}",platform.referer(),username),
-
+        "accept": "text/html",
     }))
     .map_err(s!())?;
-    // get hls url prefix
-    let url = "https://stripchat.com/api/front/models?primaryTag=girls";
-    let mut json_raw = util::get_retry(url, 5, Some(&headers)).map_err(s!())?;
-    let json: serde_json::Value = match serde_json::from_str(&json_raw).map_err(e!()) {
-        Ok(r) => r,
-        Err(e) => {
-            if !env::var("DEBUG").is_ok() {
-                json_raw.truncate(100);
-            }
-            let err = format!("{}: {}", e, json_raw);
-            return Err(err)?;
-        }
-    };
-    let ref_hls = json
-        .get("models")
-        .and_then(|o| o.as_array()?.get(0)?.get("hlsPlaylist")?.as_str())
+    // get json embeded in html
+    let url = format!("https://stripchat.com/{}", username);
+    let raw_html = util::get_retry(&url, 5, Some(&headers)).map_err(s!())?;
+    let re: &Arc<regex::Regex> = REGEX_HTML_PARSE.get_or_init(|| {
+        regex::Regex::new(
+            r#"<script>\n?\s*?window.__PRELOADED_STATE__\s?=\s?(\{([^>]|\n)+)</script>"#,
+        )
+        .unwrap()
+        .into()
+    });
+    let json_raw = re
+        .captures(&raw_html)
+        .and_then(|cap| cap.get(1))
+        .map(|s| s.as_str())
         .ok_or_else(o!())?;
-    let hls_prefix = ref_hls
-        .split("/")
-        .collect::<Vec<&str>>()
-        .get(..3)
-        .ok_or_else(o!())?
-        .join("/");
-    // get model ID
-    let url = format!(
-        "https://stripchat.com/api/front/v2/models/username/{}/cam",
-        username
-    );
-    let mut json_raw = util::get_retry(&url, 5, Some(&headers)).map_err(s!())?;
-    let json: serde_json::Value = match serde_json::from_str(&json_raw).map_err(e!()) {
-        Ok(r) => r,
-        Err(e) => {
-            if !env::var("DEBUG").is_ok() {
-                json_raw.truncate(100);
-            }
-            let err = format!("{}: {}", e, json_raw);
-            return Err(err)?;
-        }
-    };
+    let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
+    // get model id
     let model_id = json
-        .get("user")
-        .and_then(|o| o.get("user")?.get("id")?.as_i64())
+        .get("viewCam")
+        .and_then(|v| v.get("model"))
+        .and_then(|v| v.get("id"))
+        .and_then(|v| v.as_i64())
         .ok_or_else(o!())?;
+    // get hls url prefix
+    let hls_stream_template = json
+        .get("configV3")
+        .and_then(|v| v.get("initialCommon"))
+        .and_then(|v| v.get("hlsStreamUrlTemplate"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(o!())?;
+    let default_hls_host = json
+        .get("configV3")
+        .and_then(|v| v.get("initialCommon"))
+        .and_then(|v| v.get("defaultHlsStreamHost"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(o!())?;
+    let t = hls_stream_template.find(".").ok_or_else(o!())?;
+    let hls_prefix = format!("{}.{}", &hls_stream_template[..t], default_hls_host);
     // get largest HLS stream
     let vr = if vr { "_vr" } else { "" };
     let playlist_url = format!(
