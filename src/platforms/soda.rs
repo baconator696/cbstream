@@ -22,7 +22,17 @@ pub fn get_playlist(
     let html = util::get_retry(&url, 1, Some(&headers)).map_err(s!())?;
     let re: &Arc<regex::Regex> =
         REGEX_GET.get_or_init(|| regex::Regex::new(r#""stream":[^\}]+\}"#).unwrap().into());
-    let json_string = re.find(&html).ok_or_else(o!())?.as_str();
+    let mut json_string: Option<&str> = None;
+    for matches in re.find_iter(&html) {
+        let m = matches.as_str();
+        if m.contains("edge_servers") {
+            json_string = Some(m);
+        }
+    }
+    if json_string == None {
+        return Err("regex match: html parsing error").map_err(s!())?;
+    }
+    let json_string = json_string.ok_or_else(o!())?;
     let json: serde_json::Value =
         match serde_json::from_str(&format!("{{{}}}", json_string)).map_err(e!()) {
             Ok(r) => r,
