@@ -1,6 +1,6 @@
 ## cbstream
 
-This is a tool for recording live streams from adult entertainment platforms. It monitors streamers you add and automatically downloads their broadcasts when they go live. It currently supports **CB** (Chaturbate), **SC** (StripChat), **SCVR** (StripChat VR), **BONGA** (BongaCams), and **MFC** (MyFreeCams).
+This is a tool for recording live streams from adult entertainment platforms. It monitors streamers you add and automatically downloads their broadcasts when they go live. It currently supports **CB** (Chaturbate), **SC** (Stripchat), **SCVR** (Stripchat VR), **BONGA** (Bongacams), **MFC** (MyFreeCams), **F4F** (Flirt4Free), **C4** (Cam4), and **SODA** (CamSoda).
 
 
 ---
@@ -36,15 +36,16 @@ The configuration file follows this structure:
       "SC": ["model4"],
       "SCVR": [],
       "BONGA": [],
-      "MFC": ["model3"]
+      "MFC": ["model3"],
+      "F4F":[],
+      "C4":[],
+      "SODA":[]
   },
   "config": {
       "user-agent": ""
   }
 }
 ```
-
-- **CB** (Chaturbate), **SC** (StripChat), **SCVR** (StripChat VR), **BONGA** (BongaCams), **MFC** (MyFreeCams): Supported platforms. Add model names to the respective lists.
 
 Downloaded streams are saved in the working directory inside folders named after each model.
 
