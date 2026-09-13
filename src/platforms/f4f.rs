@@ -44,12 +44,8 @@ pub fn get_playlist(
     // determine if model is online
     let online_models_value_option = json.as_array().and_then(|m| {
         m.iter().find_map(|model_value| {
-            model_value
-                .get("model_seo_name")
-                .and_then(|model_name_val| model_name_val.as_str())
-                .and_then(|model_name| {
-                    (model_name == username.to_lowercase()).then_some(model_value)
-                })
+            let model_name_val = model_value.get("model_seo_name")?;
+            (model_name_val.as_str()? == username.to_lowercase()).then_some(model_value)
         })
     });
     // get model id
@@ -74,16 +70,11 @@ pub fn get_playlist(
         .ok_or_else(o!())?;
     let ws_port_tobe = json
         .get("config")
-        .and_then(|v| v.get("room"))
-        .and_then(|v| v.get("port_to_be"))
-        .and_then(|v| v.as_str())
+        .and_then(|v| v.get("room")?.get("port_to_be")?.as_str())
         .ok_or_else(o!())?;
     let ws_host = json
         .get("config")
-        .and_then(|v| v.get("room"))
-        .and_then(|v| v.get("host"))
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.split(".").next())
+        .and_then(|v| v.get("room")?.get("host")?.as_str()?.split(".").next())
         .ok_or_else(o!())?;
     let ws_url = format!(
         "wss://www.flirt4free.com/{}/chat?token={}&port_to_be={}&model_id={}",
@@ -101,13 +92,16 @@ pub fn get_playlist(
     let ws_json: serde_json::Value = serde_json::from_str(&ws_json_raw).map_err(e!())?;
     let stream_key = ws_json
         .get("data")
-        .and_then(|v| v.get("video_info"))
-        .and_then(|v| v.get("hls"))
-        .and_then(|v| v.get("providers"))
-        .and_then(|v| v.as_array())
-        .and_then(|vec| vec.iter().next())
-        .and_then(|v| v.get("stream_key"))
-        .and_then(|v| v.as_str())
+        .and_then(|v| {
+            v.get("video_info")?
+                .get("hls")?
+                .get("providers")?
+                .as_array()?
+                .iter()
+                .next()?
+                .get("stream_key")?
+                .as_str()
+        })
         .ok_or_else(o!())?;
     let main_playlist_url = format!(
         "https://hls.vscdns.com/manifest.m3u8?key={}&model_id={}",
@@ -138,9 +132,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream
         // parse stream id
         let id = line
             .find(".ts")
-            .and_then(|n| line.get(..n))
-            .and_then(|s| s.split("_").last())
-            .and_then(|s| s.parse::<u32>().ok())
+            .and_then(|n| line.get(..n)?.split("_").last()?.parse::<u32>().ok())
             .ok_or_else(o!())?;
         //parse filenames
         let date = util::date();

@@ -50,28 +50,30 @@ pub fn sc_get_playlist(
     let json_raw = re
         .captures(&raw_html)
         .and_then(|cap| cap.get(1))
-        .map(|s| s.as_str())
-        .ok_or_else(o!())?;
+        .ok_or_else(o!())?
+        .as_str();
     let json: serde_json::Value = serde_json::from_str(&json_raw).map_err(e!())?;
     // get model id
     let model_id = json
         .get("viewCam")
-        .and_then(|v| v.get("model"))
-        .and_then(|v| v.get("id"))
-        .and_then(|v| v.as_i64())
+        .and_then(|v| v.get("model")?.get("id")?.as_i64())
         .ok_or_else(o!())?;
     // get hls url prefix
     let hls_stream_template = json
         .get("configV3")
-        .and_then(|v| v.get("initialCommon"))
-        .and_then(|v| v.get("hlsStreamUrlTemplate"))
-        .and_then(|v| v.as_str())
+        .and_then(|v| {
+            v.get("initialCommon")?
+                .get("hlsStreamUrlTemplate")?
+                .as_str()
+        })
         .ok_or_else(o!())?;
     let default_hls_host = json
         .get("configV3")
-        .and_then(|v| v.get("initialCommon"))
-        .and_then(|v| v.get("defaultHlsStreamHost"))
-        .and_then(|v| v.as_str())
+        .and_then(|v| {
+            v.get("initialCommon")?
+                .get("defaultHlsStreamHost")?
+                .as_str()
+        })
         .ok_or_else(o!())?;
     let t = hls_stream_template.find(".").ok_or_else(o!())?;
     let hls_prefix = format!("{}.{}", &hls_stream_template[..t], default_hls_host);
@@ -109,7 +111,7 @@ pub fn sc_get_playlist(
                 continue;
             }
             if let Some(url) = playlist_url {
-                let playlist_url_append = format!("{}?&psch={}&pkey={}", url, psch_ver, pkey);
+                let playlist_url_append = format!("{}&psch={}&pkey={}", url, psch_ver, pkey);
                 playlist_url = Some(playlist_url_append);
                 break;
             }

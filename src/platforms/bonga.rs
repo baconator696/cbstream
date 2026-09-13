@@ -45,10 +45,7 @@ pub fn get_playlist(
     };
     let hls = match json
         .get("localData")
-        .ok_or_else(o!())?
-        .get("videoServerUrl")
-        .ok_or_else(o!())?
-        .as_str()
+        .and_then(|v| v.get("videoServerUrl")?.as_str())
     {
         Some(o) => o,
         None => return Ok((None, None)),
@@ -56,16 +53,14 @@ pub fn get_playlist(
     let performer_data = json.get("performerData").ok_or_else(o!())?;
     if !performer_data
         .get("isOnline")
-        .ok_or_else(o!())?
-        .as_bool()
+        .and_then(|v| v.as_bool())
         .ok_or_else(o!())?
     {
         return Ok((None, None));
     }
     if performer_data
         .get("isAway")
-        .ok_or_else(o!())?
-        .as_bool()
+        .and_then(|v| v.as_bool())
         .ok_or_else(o!())?
     {
         return Ok((None, None));
@@ -75,8 +70,7 @@ pub fn get_playlist(
         hls,
         performer_data
             .get("username")
-            .ok_or_else(o!())?
-            .as_str()
+            .and_then(|v| v.as_str())
             .ok_or_else(o!())?
     );
     // get playlist of resolutions

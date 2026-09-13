@@ -49,8 +49,7 @@ pub fn get_playlist(
     };
     let playlist_url = json
         .get("hls_source")
-        .ok_or_else(o!())?
-        .as_str()
+        .and_then(|v| v.as_str())
         .ok_or_else(o!())?;
     if playlist_url.len() == 0 {
         return Ok((None, None));

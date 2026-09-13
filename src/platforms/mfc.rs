@@ -30,8 +30,7 @@ pub fn get_playlist(
     };
     let user = json
         .get("result")
-        .ok_or_else(o!())?
-        .get("user")
+        .and_then(|v| v.get("user"))
         .ok_or_else(o!())?;
     let id = match user.get("id").ok_or_else(o!())?.as_i64() {
         Some(o) => o,
@@ -48,21 +47,18 @@ pub fn get_playlist(
     }
     let server_name = sessions[0]
         .get("server_name")
-        .ok_or_else(o!())?
-        .as_str()
+        .and_then(|v| v.as_str())
         .ok_or_else(o!())?;
     if server_name.len() == 0 {
         return Ok((None, None));
     }
     let phase = sessions[0]
         .get("phase")
-        .ok_or_else(o!())?
-        .as_str()
+        .and_then(|v| v.as_str())
         .ok_or_else(o!())?;
     let playform_id = sessions[0]
         .get("platform_id")
-        .ok_or_else(o!())?
-        .as_i64()
+        .and_then(|v| v.as_i64())
         .ok_or_else(o!())?;
     let server_name = util::remove_non_num(server_name);
     let playlist_url = format!(

@@ -80,16 +80,13 @@ fn alt_playlist(
     };
     let main_playlist_url = match json
         .get("output")
-        .and_then(|v| v.as_array())
-        .and_then(|vec| {
-            vec.iter().find_map(|val| {
-                val.get("protocol")
-                    .and_then(|v| v.as_str())
-                    .and_then(|s| (s == "HLS").then_some(val))
-            })
+        .and_then(|v1| {
+            v1.as_array()?
+                .iter()
+                .find_map(|v2| (v2.get("protocol")?.as_str()? == "HLS").then_some(v2))?
+                .get("uri")?
+                .as_str()
         })
-        .and_then(|v| v.get("uri"))
-        .and_then(|v| v.as_str())
         .ok_or_else(o!())
     {
         Ok(r) => r,
@@ -123,9 +120,7 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream
         // parse stream id
         let id = line
             .find(".ts")
-            .and_then(|n| line.get(..n))
-            .and_then(|s| s.split("_").last())
-            .and_then(|s| s.parse::<u64>().ok())
+            .and_then(|n| line.get(..n)?.split("_").last()?.parse::<u64>().ok())
             .ok_or_else(o!())?;
         let id = if playlist.playlist.as_ref().unwrap().contains("SERVER") {
             id as u32

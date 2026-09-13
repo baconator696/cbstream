@@ -22,13 +22,10 @@ pub fn get_playlist(
     let html = util::get_retry(&url, 1, Some(&headers)).map_err(s!())?;
     let re: &Arc<regex::Regex> =
         REGEX_GET.get_or_init(|| regex::Regex::new(r#""stream":[^\}]+\}"#).unwrap().into());
-    let mut json_string: Option<&str> = None;
-    for matches in re.find_iter(&html) {
-        let m = matches.as_str();
-        if m.contains("edge_servers") {
-            json_string = Some(m);
-        }
-    }
+
+    let json_string = re
+        .find_iter(&html)
+        .find_map(|m| (m.as_str().contains("edge_servers")).then_some(m.as_str()));
     if json_string == None {
         return Err("regex match: html parsing error").map_err(s!())?;
     }
@@ -48,8 +45,7 @@ pub fn get_playlist(
     let json = json.get("stream").ok_or_else(o!())?;
     let hostname_array = json
         .get("edge_servers")
-        .ok_or_else(o!())?
-        .as_array()
+        .and_then(|v| v.as_array())
         .ok_or_else(o!())?;
     if hostname_array.len() == 0 {
         return Ok((None, None));
@@ -57,13 +53,11 @@ pub fn get_playlist(
     let hostname = hostname_array[0].as_str().ok_or_else(o!())?;
     let stream_name = json
         .get("stream_name")
-        .ok_or_else(o!())?
-        .as_str()
+        .and_then(|v| v.as_str())
         .ok_or_else(o!())?;
     let token = json
         .get("token")
-        .ok_or_else(o!())?
-        .as_str()
+        .and_then(|v| v.as_str())
         .ok_or_else(o!())?;
     let playlist_url = format!(
         "https://{}/{}_v1/index.ll.m3u8?multitrack=true&filter=tracks:v4v3v2v1a1a2&token={}",
@@ -114,12 +108,8 @@ pub fn parse_playlist(playlist: &mut stream::Playlist) -> Res<Vec<stream::Stream
         let re = REGEX_PARSE.get_or_init(|| regex::Regex::new(r"-(\d*).llhls.mp4").unwrap().into());
         let id = re
             .captures(line)
-            .ok_or_else(o!())?
-            .get(1)
-            .ok_or_else(o!())?
-            .as_str()
-            .parse::<u32>()
-            .map_err(e!())?;
+            .and_then(|caps| caps.get(1)?.as_str().parse::<u32>().ok())
+            .ok_or_else(o!())?;
         // parse filenames
         let date = util::date();
         let filename = format!("CS_{}_{}", playlist.username, date);
