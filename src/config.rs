@@ -86,25 +86,25 @@ impl Config {
     pub fn download(&mut self) -> Res<()> {
         let mut handles: Vec<_> = Vec::new();
         let settings = Arc::new(self.config.clone());
-        for (_, mut models) in self.platform.drain() {
+        for (_, mut platform_models) in self.platform.drain() {
             let s = settings.clone();
             let handle: thread::JoinHandle<Result<HashSet<Model>, String>> =
                 thread::spawn(move || {
-                    for model_ref in models.clone() {
-                        if let Some(mut model) = models.take(&model_ref) {
+                    for model_ref in platform_models.clone() {
+                        if let Some(mut model) = platform_models.take(&model_ref) {
                             model.download(s.clone()).map_err(s!())?;
-                            models.insert(model);
+                            platform_models.insert(model);
                             thread::sleep(time::Duration::from_millis(500));
                         }
                     }
-                    Ok(models)
+                    Ok(platform_models)
                 });
             handles.push(handle);
         }
         for handle in handles {
-            let models = handle.join().map_err(h!())?.map_err(s!())?;
-            if let Some(platform) = models.iter().next().map(|o| o.platform.clone()) {
-                self.platform.insert(platform, models);
+            let platform_models = handle.join().map_err(h!())?.map_err(s!())?;
+            if let Some(platform) = platform_models.iter().next().map(|o| o.platform.clone()) {
+                self.platform.insert(platform, platform_models);
             }
         }
         Ok(())

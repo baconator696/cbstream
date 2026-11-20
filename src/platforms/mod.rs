@@ -168,6 +168,7 @@ impl Model {
             return Ok(());
         }
         if self.is_online(settings.clone()) {
+            self.downloading = Arc::new(RwLock::new(true));
             self.start_download_thread(settings).map_err(s!())?;
         }
         Ok(())
@@ -180,7 +181,6 @@ impl Model {
         let platform = self.platform.clone();
         let settings = settings.clone();
         let downloading = self.downloading.clone();
-        *downloading.write().map_err(s!())? = true;
         let handle = thread::spawn(move || {
             Playlist::new(
                 platform,
@@ -216,15 +216,7 @@ impl PartialEq for Model {
 }
 impl Clone for Model {
     fn clone(&self) -> Self {
-        Self {
-            platform: self.platform.clone(),
-            username: self.username.clone(),
-            downloading: self.downloading.clone(),
-            playlist_link: self.playlist_link.clone(),
-            playlist_audio_link: self.playlist_audio_link.clone(),
-            thread_handles: Vec::new(),
-            abort: self.abort.clone(),
-        }
+        Self::new(self.platform.clone(), &self.username)
     }
 }
 impl Drop for Model {
