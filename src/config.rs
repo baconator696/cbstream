@@ -84,7 +84,7 @@ impl Config {
     }
     /// checks each model, and starts download if online
     pub fn download(&mut self) -> Res<()> {
-        let mut headers: Vec<_> = Vec::new();
+        let mut handles: Vec<_> = Vec::new();
         let settings = Arc::new(self.config.clone());
         for (_, mut models) in self.platform.drain() {
             let s = settings.clone();
@@ -99,10 +99,10 @@ impl Config {
                     }
                     Ok(models)
                 });
-            headers.push(handle);
+            handles.push(handle);
         }
-        for header in headers {
-            let models = header.join().map_err(h!())?.map_err(s!())?;
+        for handle in handles {
+            let models = handle.join().map_err(h!())?.map_err(s!())?;
             if let Some(platform) = models.iter().next().map(|o| o.platform.clone()) {
                 self.platform.insert(platform, models);
             }
