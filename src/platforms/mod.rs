@@ -216,7 +216,15 @@ impl PartialEq for Model {
 }
 impl Clone for Model {
     fn clone(&self) -> Self {
-        Self::new(self.platform.clone(), &self.username)
+        Self {
+            platform: self.platform.clone(),
+            username: self.username.clone(),
+            downloading: self.downloading.clone(),
+            playlist_link: self.playlist_link.clone(),
+            playlist_audio_link: self.playlist_audio_link.clone(),
+            thread_handles: Vec::new(),
+            abort: self.abort.clone(),
+        }
     }
 }
 impl Drop for Model {
