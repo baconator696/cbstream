@@ -86,7 +86,10 @@ impl Playlist {
         }
         let mut mux_thread: Option<thread::JoinHandle<Result<(), String>>> = None;
         let mut trys = 0;
-        while !self.abort_get().map_err(s!())? && !abort::get().map_err(s!())? {
+        while !self.abort_get().map_err(s!())?
+            && !abort::get().map_err(s!())?
+            && *self.downloading.read().map_err(s!())?
+        {
             if let Some(mux_thread) = mux_thread.as_ref() {
                 if mux_thread.is_finished() {
                     break;
@@ -225,7 +228,9 @@ impl Playlist {
                 // gets next stream and quit if done
                 let next_stream_yield = stream.read().map_err(s!())?.next_stream_yield_rx.clone();
                 loop {
+                    // checks yield exists
                     if let Some(next_stream_yield) = next_stream_yield.clone() {
+                        // waits on yeild and continues
                         if next_stream_yield
                             .lock()
                             .map_err(s!())?
@@ -235,19 +240,25 @@ impl Playlist {
                             break;
                         }
                     } else {
+                        // yeild doesn't exist and continues
                         break;
                     }
+                    // if yield exists but fails
+                    // checks if next stream is available
                     if stream.read().map_err(s!())?.next_stream.is_none() {
+                        // if stream is not available, checks if it is still downloading and loops
                         if !*self.downloading.read().map_err(s!())? {
                             break 'inner;
                         }
                     } else {
+                        // next stream is available and continues
                         break;
                     }
                 }
                 let next_stream = match stream.write().map_err(s!())?.next_stream.take() {
                     Some(o) => o,
                     None => {
+                        // after all above checks and stream is not available, quits
                         *self.downloading.write().map_err(s!())? = false;
                         break 'inner;
                     }
